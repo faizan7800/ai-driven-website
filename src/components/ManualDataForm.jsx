@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { collection, getDocs } from "firebase/firestore" // Removed addDoc
 import { db } from "../firebase"
-import { askOpenAI, uploadCloudinaryUnsigned, analyzeVehicleImages, fetchVehicleDataFromLicensePlate } from "../services/aiBrowser"
+import { askOpenAI, uploadCloudinaryUnsigned, analyzeVehicleImages, fetchVehicleDataFromLicensePlate, extractVehicleDataFromImages } from "../services/aiBrowser"
 import { askChat } from "../services/api"
 import {
   AlertCircle,
@@ -550,53 +550,66 @@ const MAINT_TYPES = [
     setApiError(null);
 
     try {
-      let analysisResult;
-      let fetchedApiData = null;
-      let fetchError = null;
+      let vehicleData = null;
+      let vehicleDataSource = null;
+      let healthAnalysis = null;
 
-      // Always analyze images if provided
-      if (tireImages.length > 0) {
-        console.log("[v0] Analyzing vehicle images:", tireImages.length);
-        const visionResult = await analyzeVehicleImages(tireImages, vehicleType, mileage, make, model);
-        
-        if (visionResult.error) {
-          console.error("[v0] Image analysis error:", visionResult.error);
-          setIsAnalyzing(false);
-          alert("Image analysis failed: " + visionResult.error);
-          return;
-        }
-        
-        // Transform vision API result to match expected format
-        analysisResult = {
-          imageAnalysis: visionResult.imageAnalysis || "Analysis complete",
-          condition: visionResult.condition || "Vehicle condition assessed from images",
-          riskLevel: visionResult.riskLevel || "medium",
-          criticalIssues: visionResult.criticalIssues || [],
-          maintenance: visionResult.maintenance || [],
-          recommendations: visionResult.recommendations || [],
-          maintenanceTimeline: visionResult.maintenanceTimeline || "Based on condition"
-        };
-      }
+      console.log("[v0] Starting vehicle data fetch and analysis...");
 
-      // Try to fetch license plate data from API (parallel with image analysis)
+      // Step 1: Try to fetch from API first
       if (plate) {
-        console.log("[v0] Fetching license plate data for plate:", plate);
+        console.log("[v0] Attempting to fetch vehicle data from API for plate:", plate);
         const apiResult = await fetchVehicleDataFromLicensePlate(plate, make, model);
         
         if (apiResult.success && apiResult.data) {
-          console.log("[v0] License plate API returned data");
-          fetchedApiData = apiResult.data;
-          setApiVehicleData(fetchedApiData);
+          console.log("[v0] API returned vehicle data successfully");
+          vehicleData = apiResult.data;
+          vehicleDataSource = "API";
+          setApiVehicleData(vehicleData);
         } else {
-          console.log("[v0] License plate API failed:", apiResult.error);
-          fetchError = apiResult.error;
-          setApiError(fetchError);
+          console.log("[v0] API failed, will use AI extraction:", apiResult.error);
+          setApiError(apiResult.error);
         }
       }
 
-      setTireAnalysis(analysisResult); 
-      
-      // Pass the analysis result up to the parent component for saving
+      // Step 2: If API failed or no plate, extract vehicle data from images using AI
+      if (!vehicleData && tireImages.length > 0) {
+        console.log("[v0] Extracting vehicle data from images using AI...");
+        const extractionResult = await extractVehicleDataFromImages(tireImages, plate, make, model);
+        
+        if (extractionResult.success && extractionResult.data) {
+          console.log("[v0] AI extraction successful");
+          vehicleData = extractionResult.data;
+          vehicleDataSource = "AI (Extracted from Images)";
+          setApiVehicleData(vehicleData);
+        } else {
+          console.error("[v0] AI extraction failed:", extractionResult.error);
+          setApiError(extractionResult.error || "Failed to extract vehicle data from images");
+        }
+      }
+
+      // Step 3: Always perform maintenance/health analysis of the images
+      if (tireImages.length > 0) {
+        console.log("[v0] Performing health/maintenance analysis of vehicle images");
+        const healthResult = await analyzeVehicleImages(tireImages, vehicleType, mileage, make, model);
+        
+        if (!healthResult.error) {
+          healthAnalysis = {
+            imageAnalysis: healthResult.imageAnalysis || "Analysis complete",
+            condition: healthResult.condition || "Vehicle condition assessed from images",
+            riskLevel: healthResult.riskLevel || "medium",
+            criticalIssues: healthResult.criticalIssues || [],
+            maintenance: healthResult.maintenance || [],
+            recommendations: healthResult.recommendations || [],
+            maintenanceTimeline: healthResult.maintenanceTimeline || "Based on condition"
+          };
+        }
+      }
+
+      // Set the analysis result
+      setTireAnalysis(healthAnalysis);
+
+      // Pass complete results to parent
       onAnalysisComplete({
         vehicleType,
         mileage,
@@ -605,9 +618,9 @@ const MAINT_TYPES = [
         licensePlate: plate,
         timestamp: new Date().toISOString(),
         imageCount: tireImages.length,
-        analysis: analysisResult,
-        apiData: fetchedApiData,
-        apiError: fetchError
+        vehicleData: vehicleData,
+        vehicleDataSource: vehicleDataSource,
+        healthAnalysis: healthAnalysis
       });
 
     } catch (e) {
@@ -928,26 +941,82 @@ const MAINT_TYPES = [
               </>
             )}
 
-            {/* API Vehicle Data Display */}
+            {/* Vehicle Data Display (API or AI Extracted) */}
             {apiVehicleData && (
-              <div className="space-y-4 p-6 bg-green-50 rounded-xl shadow-lg border border-green-200">
-                <h2 className="text-2xl font-bold text-green-900 border-b pb-4 mb-4 flex items-center gap-2">
-                  <Car size={24} className="text-green-600" /> License Plate Data Found
+              <div className="space-y-4 p-6 bg-blue-50 rounded-xl shadow-lg border border-blue-200">
+                <h2 className="text-2xl font-bold text-blue-900 border-b pb-4 mb-4 flex items-center gap-2">
+                  <Car size={24} className="text-blue-600" /> 
+                  Vehicle Data
+                  <span className="text-sm font-normal text-blue-700 ml-2">
+                    ({apiVehicleData.source || "API"})
+                  </span>
                 </h2>
-                <div className="bg-white rounded-lg p-4 max-h-96 overflow-y-auto">
-                  <pre className="text-xs text-slate-700 whitespace-pre-wrap break-words">
-                    {JSON.stringify(apiVehicleData, null, 2)}
-                  </pre>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Key vehicle information */}
+                  <div className="bg-white rounded-lg p-4">
+                    <h3 className="font-semibold text-slate-900 mb-3">Basic Information</h3>
+                    <div className="space-y-2 text-sm">
+                      {apiVehicleData.make && (
+                        <div><span className="font-medium text-slate-700">Make:</span> {apiVehicleData.make}</div>
+                      )}
+                      {apiVehicleData.model && (
+                        <div><span className="font-medium text-slate-700">Model:</span> {apiVehicleData.model}</div>
+                      )}
+                      {apiVehicleData.year && (
+                        <div><span className="font-medium text-slate-700">Year:</span> {apiVehicleData.year}</div>
+                      )}
+                      {apiVehicleData.bodyType && (
+                        <div><span className="font-medium text-slate-700">Body Type:</span> {apiVehicleData.bodyType}</div>
+                      )}
+                      {apiVehicleData.color && (
+                        <div><span className="font-medium text-slate-700">Color:</span> {apiVehicleData.color}</div>
+                      )}
+                      {apiVehicleData.condition && (
+                        <div><span className="font-medium text-slate-700">Condition:</span> {apiVehicleData.condition}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Additional details */}
+                  <div className="bg-white rounded-lg p-4">
+                    <h3 className="font-semibold text-slate-900 mb-3">Additional Details</h3>
+                    <div className="space-y-2 text-sm">
+                      {apiVehicleData.mileageEstimate && (
+                        <div><span className="font-medium text-slate-700">Estimated Mileage:</span> {apiVehicleData.mileageEstimate}</div>
+                      )}
+                      {apiVehicleData.transmission && (
+                        <div><span className="font-medium text-slate-700">Transmission:</span> {apiVehicleData.transmission}</div>
+                      )}
+                      {apiVehicleData.fuelType && (
+                        <div><span className="font-medium text-slate-700">Fuel Type:</span> {apiVehicleData.fuelType}</div>
+                      )}
+                      {apiVehicleData.estimatedValue && (
+                        <div><span className="font-medium text-slate-700">Estimated Value:</span> {apiVehicleData.estimatedValue}</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
+
+                {/* Full JSON for reference */}
+                <details className="mt-4">
+                  <summary className="cursor-pointer font-semibold text-slate-700 hover:text-slate-900">
+                    View Full Data (JSON)
+                  </summary>
+                  <div className="bg-white rounded-lg p-4 mt-2 max-h-96 overflow-y-auto">
+                    <pre className="text-xs text-slate-700 whitespace-pre-wrap break-words">
+                      {JSON.stringify(apiVehicleData, null, 2)}
+                    </pre>
+                  </div>
+                </details>
               </div>
             )}
 
             {apiError && !apiVehicleData && (
               <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
                 <p className="text-amber-800 text-sm">
-                  <span className="font-semibold">License Plate API: </span>{apiError}
+                  <span className="font-semibold">License Plate Data Not Found: </span>{apiError}
                   <br />
-                  <span className="text-xs mt-1 block">Using AI image analysis results below instead.</span>
+                  <span className="text-xs mt-1 block">AI has extracted vehicle information from your uploaded images instead.</span>
                 </p>
               </div>
             )}

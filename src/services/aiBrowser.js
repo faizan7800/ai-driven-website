@@ -298,6 +298,156 @@ export const fetchVehicleDataFromLicensePlate = async (licensePlate, make = "", 
   }
 };
 
+/* ----------  Extract Vehicle Data from Images (AI Fallback for API)  ---------- */
+export const extractVehicleDataFromImages = async (images, licensePlate = "", make = "", model = "") => {
+  try {
+    const apiKey = import.meta.env.VITE_OPEN_API_KEY;
+    
+    if (!apiKey) {
+      console.error("[v0] OpenAI API key not found");
+      return { error: "API key not configured. Please check your .env file." };
+    }
+    
+    // Convert images to base64
+    const imagePromises = images.map(img => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = reader.result.split(',')[1];
+          resolve({
+            type: "image_url",
+            image_url: {
+              url: `data:${img.type};base64,${base64}`
+            }
+          });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(img);
+      });
+    });
+    
+    const imageContents = await Promise.all(imagePromises);
+    
+    // Build extraction prompt for vehicle data similar to API response format
+    const extractionPrompt = `You are an expert vehicle data analyst. Based on the provided vehicle image(s), extract and provide comprehensive vehicle information in JSON format.
+
+User provided information:
+- License Plate: ${licensePlate || "Not provided"}
+- Make: ${make || "Extract from images if possible"}
+- Model: ${model || "Extract from images if possible"}
+
+Analyze the image(s) carefully to identify and extract as much information as possible:
+- Make (manufacturer/brand): e.g., Toyota, BMW, Ford, Honda
+- Model: e.g., Camry, 3 Series, Mustang
+- Body Type: e.g., Sedan, SUV, Truck, Coupe
+- Color: Primary and secondary exterior colors
+- Year/Generation: Approximate year if visible from design
+- Condition: Overall condition assessment
+- Mileage Estimate: Rough estimate from visible wear patterns
+- Exterior Features: Visible modifications, trim level, special equipment
+- Interior Details: Visible interior condition and features
+- Engine Bay: Visible engine condition and components
+- Notable Observations: Any unique characteristics, damage, modifications, wear patterns
+
+Provide the following comprehensive JSON structure (extract as much as you can confidently identify):
+{
+  "licensePlate": "${licensePlate || ""}",
+  "make": "Vehicle make extracted or provided",
+  "model": "Vehicle model extracted or provided",
+  "bodyType": "Body type from images",
+  "color": "Primary color visible in images",
+  "secondaryColor": "Secondary color if visible",
+  "year": "Approximate year from design cues",
+  "condition": "Overall condition assessment (Excellent/Good/Fair/Poor)",
+  "mileageEstimate": "Estimated mileage from visible wear",
+  "transmission": "Manual/Automatic if visible",
+  "fuelType": "Petrol/Diesel/Hybrid/Electric if identifiable",
+  "features": [
+    "Feature 1 visible",
+    "Feature 2 visible"
+  ],
+  "exteriorCondition": "Detailed assessment of paint, dents, rust, scratches",
+  "interiorCondition": "Visible interior condition and cleanliness",
+  "tiresCondition": "Tire condition assessment if visible",
+  "engineCondition": "Engine bay condition if visible",
+  "modifications": [
+    "Visible modification 1",
+    "Visible modification 2"
+  ],
+  "estimatedValue": "Rough value estimate based on condition and features",
+  "commonIssues": [
+    "Potential issue 1 based on observations",
+    "Potential issue 2 based on observations"
+  ],
+  "maintenanceNeeds": [
+    "Maintenance recommendation 1",
+    "Maintenance recommendation 2"
+  ],
+  "detailedObservations": "Comprehensive observations about the vehicle based on visual inspection",
+  "source": "AI Extracted from Images"
+}
+
+Provide ONLY valid JSON without markdown formatting or code blocks. Extract maximum information from what you can see in the images.`;
+
+    const url = "https://api.openai.com/v1/chat/completions";
+    
+    const body = {
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: extractionPrompt
+            },
+            ...imageContents
+          ]
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 2000
+    };
+
+    const headers = {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    };
+
+    console.log("[v0] Extracting vehicle data from images...");
+    const resp = await axios.post(url, body, { headers });
+    const responseText = resp.data.choices?.[0]?.message?.content || "{}";
+    
+    console.log("[v0] Vehicle extraction response:", responseText);
+    
+    // Parse JSON response
+    try {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
+      const extractedData = JSON.parse(jsonStr);
+      return {
+        success: true,
+        data: extractedData,
+        isFromAI: true,
+        source: "AI Extracted from Images"
+      };
+    } catch (parseErr) {
+      console.error("[v0] Failed to parse extraction response:", parseErr);
+      return {
+        success: false,
+        error: "Failed to parse vehicle data extraction",
+        rawResponse: responseText
+      };
+    }
+  } catch (err) {
+    console.error("[v0] Vehicle extraction error:", err.response?.status, err.response?.data || err.message);
+    return {
+      error: "Failed to extract vehicle data from images",
+      details: err.response?.data?.error?.message || err.message
+    };
+  }
+};
+
 /* ----------  Cloudinary UNSIGNED (works locally)  ---------- */
 export async function uploadCloudinaryUnsigned(file, folder = "vehicle-app") {
   const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`;
