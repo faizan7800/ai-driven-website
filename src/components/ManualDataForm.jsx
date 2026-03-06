@@ -539,6 +539,7 @@ const MAINT_TYPES = [
       let vehicleData = null;
       let vehicleDataSource = null;
       let healthAnalysis = null;
+      let apiSucceeded = false;
 
       console.log("[v0] Starting vehicle data fetch and analysis...");
 
@@ -548,21 +549,28 @@ const MAINT_TYPES = [
         const apiResult = await fetchVehicleDataFromLicensePlate(plate, make, model);
         
         if (apiResult.success && apiResult.data) {
-          console.log("[v0] API returned vehicle data successfully");
+          console.log("[v0] API returned vehicle data successfully - skipping analysis");
           vehicleData = apiResult.data;
           vehicleDataSource = "API";
+          apiSucceeded = true;
           setApiVehicleData(vehicleData);
         } else {
-          console.log("[v0] API failed, will use AI extraction:", apiResult.error);
+          console.log("[v0] API failed, will do AI extraction + analysis:", apiResult.error);
           setApiError(apiResult.error);
         }
       }
 
-      // Step 2: If API failed or no plate, extract vehicle data from images using AI
-      if (!vehicleData && tireImages.length > 0) {
-        console.log("[v0] Extracting vehicle data from images using AI...");
-        const extractionResult = await extractVehicleDataFromImages(tireImages, plate, make, model);
+      // Step 2: If API failed, do BOTH extraction and analysis in parallel
+      if (!apiSucceeded && tireImages.length > 0) {
+        console.log("[v0] API failed - running AI extraction and health analysis in parallel...");
         
+        // Run extraction and analysis at the same time
+        const [extractionResult, healthResult] = await Promise.all([
+          extractVehicleDataFromImages(tireImages, plate, make, model),
+          analyzeVehicleImages(tireImages, vehicleType, mileage, make, model)
+        ]);
+
+        // Handle extraction result
         if (extractionResult.success && extractionResult.data) {
           console.log("[v0] AI extraction successful");
           vehicleData = extractionResult.data;
@@ -572,14 +580,10 @@ const MAINT_TYPES = [
           console.error("[v0] AI extraction failed:", extractionResult.error);
           setApiError(extractionResult.error || "Failed to extract vehicle data from images");
         }
-      }
 
-      // Step 3: Always perform maintenance/health analysis of the images
-      if (tireImages.length > 0) {
-        console.log("[v0] Performing health/maintenance analysis of vehicle images");
-        const healthResult = await analyzeVehicleImages(tireImages, vehicleType, mileage, make, model);
-        
+        // Handle health analysis result
         if (!healthResult.error) {
+          console.log("[v0] Health analysis successful");
           healthAnalysis = {
             imageAnalysis: healthResult.imageAnalysis || "Analysis complete",
             condition: healthResult.condition || "Vehicle condition assessed from images",
@@ -589,11 +593,9 @@ const MAINT_TYPES = [
             recommendations: healthResult.recommendations || [],
             maintenanceTimeline: healthResult.maintenanceTimeline || "Based on condition"
           };
+          setTireAnalysis(healthAnalysis);
         }
       }
-
-      // Set the analysis result
-      setTireAnalysis(healthAnalysis);
 
       // Pass complete results to parent
       onAnalysisComplete({
@@ -606,7 +608,8 @@ const MAINT_TYPES = [
         imageCount: tireImages.length,
         vehicleData: vehicleData,
         vehicleDataSource: vehicleDataSource,
-        healthAnalysis: healthAnalysis
+        healthAnalysis: healthAnalysis,
+        apiSucceeded: apiSucceeded
       });
 
     } catch (e) {
