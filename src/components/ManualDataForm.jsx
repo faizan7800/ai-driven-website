@@ -275,7 +275,7 @@ const TireAnalysisResults = ({ analysis, onAnalyzeAgain }) => {
 
 // --- Main Component ---
 
-export default function ManualDataForm({ manualData = {}, setManualData, plate = "", readOnly = false, onAnalysisComplete }) { // Added onAnalysisComplete prop
+export default function ManualDataForm({ manualData = {}, setManualData, plate = "", readOnly = false, onAnalysisComplete, vehicleImages = [], vehicleMake = "", vehicleModel = "" }) { // Added image and make/model props
   const {t} = useTranslation('mdf');
   const [workshops, setWorkshops] = useState([])
   const [leaseFile, setLeaseFile] = useState(null)
@@ -348,16 +348,18 @@ const MAINT_TYPES = [
 
   // New state for tire analysis, initialized from manualData for persistence
   const [tireAnalysis, setTireAnalysis] = useState(manualData.tireAnalysis?.analysis || null);
-  const [tireImages, setTireImages] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   // New state for analysis input fields, initialized from manualData for persistence
   const [vehicleType, setVehicleType] = useState(manualData.tireAnalysis?.vehicleType || '');
   const [mileage, setMileage] = useState(manualData.tireAnalysis?.mileage || '');
-  const [make, setMake] = useState(manualData.tireAnalysis?.make || ''); // Optional make field
-  const [model, setModel] = useState(manualData.tireAnalysis?.model || ''); // Optional model field
   const [fireStoreVehiclesData, setFireStoreVehiclesData] = useState(null); // State to hold Firestore data for the vehicle
   const [apiVehicleData, setApiVehicleData] = useState(null); // State to hold API vehicle data
   const [apiError, setApiError] = useState(null); // State to hold API errors
+  
+  // Use images and make/model from parent props
+  const tireImages = vehicleImages;
+  const make = vehicleMake;
+  const model = vehicleModel;
 
   // Sync state from parent's manualData.tireAnalysis on initial load/update
   useEffect(() => {
@@ -365,8 +367,6 @@ const MAINT_TYPES = [
       setTireAnalysis(manualData.tireAnalysis.analysis || null);
       setVehicleType(manualData.tireAnalysis.vehicleType || '');
       setMileage(manualData.tireAnalysis.mileage || '');
-      setMake(manualData.tireAnalysis.make || '');
-      setModel(manualData.tireAnalysis.model || '');
     } else {
       // If parent clears the analysis, clear local state too
       setTireAnalysis(null);
@@ -522,21 +522,7 @@ const MAINT_TYPES = [
     }
   }
 
-  // --- New Tire Analysis Logic ---
-
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length > 5) {
-      alert("Maximum 5 images allowed. Only the first 5 images will be used.");
-      setTireImages(files.slice(0, 5));
-    } else {
-      setTireImages(files);
-    }
-    setTireAnalysis(null); // Clear previous analysis
-    setApiVehicleData(null); // Clear API data
-    setApiError(null); // Clear API error
-    onAnalysisComplete(null); // Notify parent to clear saved analysis
-  };
+  // --- Tire Analysis Logic ---
 
   const runTireAnalysis = async () => {
     if (!vehicleType || !mileage || tireImages.length === 0) {
@@ -842,73 +828,7 @@ const MAINT_TYPES = [
                     </div>
                 </div>
 
-                {/* Image Upload Section */}
-                <div className="border-y border-slate-200 py-4 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-3">
-                      📸 Upload Vehicle Images <span className="text-red-600">*</span> (Min 1 - Max 5 images)
-                    </label>
-                    <p className="text-xs text-slate-500 mb-2">Upload clear photos of tires, exterior, interior, engine bay, or condition for detailed AI analysis</p>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      disabled={tireImages.length >= 5}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
-                    />
-                    {tireImages.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-xs text-slate-600 mb-2">{tireImages.length} file(s) selected</p>
-                        <div className="flex flex-wrap gap-2">
-                          {tireImages.map((img, idx) => (
-                            <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-blue-100 rounded-full text-sm">
-                              <span>{img.name.substring(0, 15)}...</span>
-                              <button
-                                type="button"
-                                onClick={() => setTireImages(tireImages.filter((_, i) => i !== idx))}
-                                className="text-blue-600 hover:text-blue-800 font-bold"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {tireImages.length === 0 && (
-                      <p className="text-xs text-red-500 mt-2">At least 1 image is required for analysis</p>
-                    )}
-                  </div>
-                </div>
 
-                {/* Make and Model Fields (Optional) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Vehicle Make (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Toyota, BMW, Ford"
-                      value={make}
-                      onChange={(e) => setMake(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                      Vehicle Model (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Camry, 3 Series, Mustang"
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
 
                 {/* Analyze Button */}
                 <div className="border-t border-slate-200 py-4 space-y-4">
