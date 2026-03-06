@@ -135,7 +135,7 @@ export const askOpenAI = async (prompt, context = null) => {
 };
 
 /* ----------  OpenAI Vision API (Image Analysis)  ---------- */
-export const analyzeVehicleImages = async (images, vehicleType, mileage) => {
+export const analyzeVehicleImages = async (images, vehicleType, mileage, make = "", model = "") => {
   try {
     const apiKey = import.meta.env.VITE_OPEN_API_KEY;
     
@@ -164,35 +164,54 @@ export const analyzeVehicleImages = async (images, vehicleType, mileage) => {
     
     const imageContents = await Promise.all(imagePromises);
     
-    // Build the analysis prompt
-    const analysisPrompt = `You are an expert vehicle inspector. Analyze the provided vehicle image(s) and provide a comprehensive vehicle health report in JSON format.
+    // Build the analysis prompt with enhanced requirements
+    const vehicleInfo = [
+      `Type: ${vehicleType || "Unknown"}`,
+      `Mileage: ${mileage || "Unknown"} km`,
+      make && `Make: ${make}`,
+      model && `Model: ${model}`
+    ].filter(Boolean).join('\n');
+
+    const analysisPrompt = `You are an expert vehicle inspector and automotive technician. Analyze the provided vehicle image(s) and provide a comprehensive vehicle health report in JSON format.
 
 Vehicle Information:
-- Type: ${vehicleType || "Unknown"}
-- Mileage: ${mileage || "Unknown"} km
+${vehicleInfo}
 
-Analyze the image(s) and identify what is visible (tires, exterior, interior, engine, etc.). Provide a detailed assessment with the following JSON structure:
+Analyze the image(s) thoroughly and identify what is visible (tires, exterior condition, interior, engine bay, paint condition, rust, dents, scratches, etc.). 
+
+Provide a detailed assessment covering:
+- Overall condition and visual health
+- Tire condition and wear patterns
+- Exterior damage, dents, rust, or paint issues
+- Interior condition and wear
+- Engine bay cleanliness and component condition
+- Evidence of maintenance or neglect
+- Tuning or modifications visible
+- Estimated maintenance needs and priorities
+- Safety concerns
+
+Provide detailed assessment with the following JSON structure (ensure all fields are present):
 {
-  "imageAnalysis": "Brief description of what's visible in the image(s)",
-  "condition": "Overall condition summary based on visual inspection",
+  "imageAnalysis": "Detailed description of what's visible in the image(s), specific components, condition observations",
+  "condition": "Comprehensive overall condition summary based on visual inspection, specific observations about wear and tear",
   "riskLevel": "low|medium|high",
-  "criticalIssues": ["issue1", "issue2"],
+  "criticalIssues": ["Critical issue 1", "Critical issue 2"],
   "maintenance": [
     {
       "task": "Task name",
-      "reason": "Why this needs attention",
+      "reason": "Why this needs attention, specific observations from images",
       "priority": "low|medium|high",
-      "estimatedCost": "Approximate cost estimate"
+      "estimatedCost": "Average estimated cost range (e.g. $200-400)"
     }
   ],
   "recommendations": [
-    "Recommendation 1",
-    "Recommendation 2"
+    "Recommendation 1 based on visual inspection",
+    "Recommendation 2 based on visual inspection"
   ],
-  "maintenanceTimeline": "When maintenance should be done"
+  "maintenanceTimeline": "Detailed timeline for when maintenance should be done based on observations"
 }
 
-Provide ONLY valid JSON without markdown formatting or code blocks.`;
+Provide ONLY valid JSON without markdown formatting or code blocks. Be thorough and specific based on what you can see in the images.`;
 
     const url = "https://api.openai.com/v1/chat/completions";
     
@@ -241,6 +260,41 @@ Provide ONLY valid JSON without markdown formatting or code blocks.`;
     console.error("OpenAI Vision API error:", err.response?.status, err.response?.data || err.message);
     const errorMessage = err.response?.data?.error?.message || "Could not analyze images with OpenAI.";
     return { error: errorMessage };
+  }
+};
+
+/* ----------  Fetch Vehicle Data from License Plate API  ---------- */
+export const fetchVehicleDataFromLicensePlate = async (licensePlate, make = "", model = "") => {
+  try {
+    if (!licensePlate) {
+      return { error: "License plate is required" };
+    }
+
+    // Encode the license plate for URL
+    const encodedPlate = encodeURIComponent(licensePlate);
+    const apiUrl = `https://stagging-fori-hayk-backend.fori.co/getVehicleDataFromLicensePlate/${encodedPlate}`;
+
+    console.log("[v0] Fetching vehicle data from:", apiUrl);
+
+    const response = await axios.get(apiUrl);
+    
+    if (response.data) {
+      console.log("[v0] Vehicle data fetched successfully:", response.data);
+      return {
+        success: true,
+        data: response.data,
+        make,
+        model
+      };
+    } else {
+      return { error: "No data found for this license plate" };
+    }
+  } catch (err) {
+    console.error("[v0] License plate API error:", err.response?.status, err.response?.data || err.message);
+    return {
+      error: "Failed to fetch vehicle data from API",
+      details: err.response?.data?.error?.message || err.message
+    };
   }
 };
 
