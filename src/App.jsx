@@ -6,7 +6,7 @@ import VehicleInfo from "./components/VehicleInfo";
 import ManualDataForm from "./components/ManualDataForm";
 import { db } from "./firebase";
 import { doc, setDoc } from "firebase/firestore";
-import { fetchVehicleDataFromLicensePlate, extractVehicleDataFromImages } from "./services/aiBrowser";
+import { fetchVehicleDataFromLicensePlate, extractVehicleDataFromImages, analyzeVehicleImages } from "./services/aiBrowser";
 
 // Import other components (assuming they exist)
 import ListPage from "./pages/ListPage";
@@ -27,7 +27,7 @@ function App() {
   const [vehicleMake, setVehicleMake] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
 
-  // Fresh data fetch - no Firestore lookup
+  // Complete data fetch flow with API first, then AI fallback
   const fetchData = async (currentPlate = plate) => {
     if (!currentPlate || vehicleImages.length === 0) {
       alert("Please enter a license plate and upload at least 1 image");
@@ -40,10 +40,65 @@ function App() {
     setTireAnalysisData(null);
 
     try {
-      console.log("[v0] Fetching fresh data for plate:", currentPlate);
-      // Data will be fetched through ManualDataForm which calls the API endpoint
-      // This is just to trigger the form display
-      setVehicleData({ initialized: true }); // Placeholder to show ManualDataForm
+      console.log("[v0] Starting fetch with spinner...");
+      
+      // Step 1: Try to fetch from API first
+      console.log("[v0] Attempting API call for plate:", currentPlate);
+      const apiResult = await fetchVehicleDataFromLicensePlate(currentPlate, vehicleMake, vehicleModel);
+      
+      if (apiResult.success && apiResult.data) {
+        console.log("[v0] API succeeded - displaying vehicle data only");
+        setVehicleData({
+          ...apiResult.data,
+          source: "API"
+        });
+        setTireAnalysisData(null); // No analysis if API succeeds
+        return; // Exit early, don't do AI analysis
+      }
+
+      // Step 2: API failed - do AI extraction + health analysis in parallel
+      console.log("[v0] API failed, starting AI extraction + analysis in parallel...");
+      
+      const [extractionResult, healthResult] = await Promise.all([
+        extractVehicleDataFromImages(vehicleImages, currentPlate, vehicleMake, vehicleModel),
+        analyzeVehicleImages(vehicleImages, "", "", vehicleMake, vehicleModel) // Using empty vehicleType/mileage since not required
+      ]);
+
+      // Set extracted vehicle data
+      if (extractionResult.success && extractionResult.data) {
+        console.log("[v0] AI extraction successful");
+        setVehicleData({
+          ...extractionResult.data,
+          source: "AI (Extracted from Images)"
+        });
+      } else {
+        console.error("[v0] AI extraction failed:", extractionResult.error);
+        alert("Failed to extract vehicle data from images: " + extractionResult.error);
+      }
+
+      // Set health analysis
+      if (!healthResult.error) {
+        console.log("[v0] Health analysis successful");
+        setTireAnalysisData({
+          analysis: {
+            imageAnalysis: healthResult.imageAnalysis || "Analysis complete",
+            condition: healthResult.condition || "Vehicle condition assessed from images",
+            riskLevel: healthResult.riskLevel || "medium",
+            criticalIssues: healthResult.criticalIssues || [],
+            maintenance: healthResult.maintenance || [],
+            recommendations: healthResult.recommendations || [],
+            maintenanceTimeline: healthResult.maintenanceTimeline || "Based on condition"
+          },
+          vehicleType: "",
+          mileage: "",
+          make: vehicleMake,
+          model: vehicleModel,
+          licensePlate: currentPlate,
+          timestamp: new Date().toISOString(),
+          imageCount: vehicleImages.length
+        });
+      }
+
     } catch (err) {
       console.error("[v0] Error:", err);
       alert("Error fetching data – check console");
@@ -51,6 +106,8 @@ function App() {
       setLoading(false);
     }
   };
+
+
   // 4. Handler to receive analysis data from ManualDataForm
   const handleAnalysisComplete = (analysisResult) => {
     setTireAnalysisData(analysisResult);
@@ -218,33 +275,163 @@ const saveEverything = async () => {
             </div>
 
 
-            {/* Content grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-             {vehicleData &&<div
-              className="lg:col-span-2 space-y-4">
-                <ManualDataForm 
-                  manualData={manualDataWithAnalysis} 
-                  setManualData={setManualData} 
-                  plate={plate}
-                  onAnalysisComplete={handleAnalysisComplete}
-                  vehicleImages={vehicleImages}
-                  vehicleMake={vehicleMake}
-                  vehicleModel={vehicleModel}
-                />
-                <VehicleInfo vehicleData={vehicleData} />
+            {/* Loading Spinner */}
+            {loading && (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p className="ml-4 text-lg text-slate-700 font-medium">Fetching vehicle data...</p>
+              </div>
+            )}
+
+            {/* Results Display */}
+            {!loading && vehicleData && (
+              <div className="lg:col-span-2 space-y-6">
+                
+                {/* Vehicle Data Section */}
+                <div className="bg-blue-50 rounded-lg shadow-lg p-6 border border-blue-200">
+                  <h2 className="text-2xl font-bold text-blue-900 mb-4 flex items-center gap-2">
+                    Vehicle Information
+                    <span className="text-sm font-normal text-blue-700">
+                      ({vehicleData.source || "Unknown Source"})
+                    </span>
+                  </h2>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Basic Info */}
+                    <div className="bg-white rounded-lg p-4">
+                      <h3 className="font-semibold text-slate-900 mb-3">Basic Information</h3>
+                      <div className="space-y-2 text-sm">
+                        {vehicleData.make && <div><span className="font-medium text-slate-700">Make:</span> {vehicleData.make}</div>}
+                        {vehicleData.model && <div><span className="font-medium text-slate-700">Model:</span> {vehicleData.model}</div>}
+                        {vehicleData.year && <div><span className="font-medium text-slate-700">Year:</span> {vehicleData.year}</div>}
+                        {vehicleData.bodyType && <div><span className="font-medium text-slate-700">Body Type:</span> {vehicleData.bodyType}</div>}
+                        {vehicleData.color && <div><span className="font-medium text-slate-700">Color:</span> {vehicleData.color}</div>}
+                        {vehicleData.condition && <div><span className="font-medium text-slate-700">Condition:</span> {vehicleData.condition}</div>}
+                      </div>
+                    </div>
+
+                    {/* Additional Details */}
+                    <div className="bg-white rounded-lg p-4">
+                      <h3 className="font-semibold text-slate-900 mb-3">Additional Details</h3>
+                      <div className="space-y-2 text-sm">
+                        {vehicleData.mileageEstimate && <div><span className="font-medium text-slate-700">Estimated Mileage:</span> {vehicleData.mileageEstimate}</div>}
+                        {vehicleData.transmission && <div><span className="font-medium text-slate-700">Transmission:</span> {vehicleData.transmission}</div>}
+                        {vehicleData.fuelType && <div><span className="font-medium text-slate-700">Fuel Type:</span> {vehicleData.fuelType}</div>}
+                        {vehicleData.estimatedValue && <div><span className="font-medium text-slate-700">Estimated Value:</span> {vehicleData.estimatedValue}</div>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* View Full JSON */}
+                  <details className="mt-4">
+                    <summary className="cursor-pointer font-semibold text-slate-700 hover:text-slate-900">
+                      View Full Data (JSON)
+                    </summary>
+                    <div className="bg-white rounded-lg p-4 mt-2 max-h-96 overflow-y-auto">
+                      <pre className="text-xs text-slate-700 whitespace-pre-wrap break-words">
+                        {JSON.stringify(vehicleData, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
+                </div>
+
+                {/* Health Analysis Section (only if AI data was used) */}
+                {tireAnalysisData && (
+                  <div className="bg-amber-50 rounded-lg shadow-lg p-6 border border-amber-200">
+                    <h2 className="text-2xl font-bold text-amber-900 mb-4">Vehicle Health & Maintenance Analysis</h2>
+                    
+                    <div className="space-y-4">
+                      {tireAnalysisData.analysis?.imageAnalysis && (
+                        <div className="bg-white rounded-lg p-4">
+                          <h3 className="font-semibold text-slate-900 mb-2">Image Analysis</h3>
+                          <p className="text-slate-700 text-sm">{tireAnalysisData.analysis.imageAnalysis}</p>
+                        </div>
+                      )}
+
+                      {tireAnalysisData.analysis?.condition && (
+                        <div className="bg-white rounded-lg p-4">
+                          <h3 className="font-semibold text-slate-900 mb-2">Overall Condition</h3>
+                          <p className="text-slate-700 text-sm">{tireAnalysisData.analysis.condition}</p>
+                        </div>
+                      )}
+
+                      {tireAnalysisData.analysis?.riskLevel && (
+                        <div className="bg-white rounded-lg p-4">
+                          <h3 className="font-semibold text-slate-900 mb-2">Risk Level</h3>
+                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                            tireAnalysisData.analysis.riskLevel === 'high' ? 'bg-red-100 text-red-800' :
+                            tireAnalysisData.analysis.riskLevel === 'medium' ? 'bg-amber-100 text-amber-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {tireAnalysisData.analysis.riskLevel.toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+
+                      {tireAnalysisData.analysis?.criticalIssues && tireAnalysisData.analysis.criticalIssues.length > 0 && (
+                        <div className="bg-white rounded-lg p-4 border-l-4 border-red-500">
+                          <h3 className="font-semibold text-red-900 mb-2">Critical Issues</h3>
+                          <ul className="list-disc list-inside space-y-1">
+                            {tireAnalysisData.analysis.criticalIssues.map((issue, idx) => (
+                              <li key={idx} className="text-red-700 text-sm">{issue}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {tireAnalysisData.analysis?.maintenance && tireAnalysisData.analysis.maintenance.length > 0 && (
+                        <div className="bg-white rounded-lg p-4">
+                          <h3 className="font-semibold text-slate-900 mb-3">Maintenance Needs</h3>
+                          <div className="space-y-3">
+                            {tireAnalysisData.analysis.maintenance.map((task, idx) => (
+                              <div key={idx} className="border-l-4 border-blue-500 pl-4">
+                                <div className="font-medium text-slate-900">{task.task}</div>
+                                <div className="text-sm text-slate-600">{task.reason}</div>
+                                <div className="text-xs mt-1">
+                                  <span className={`inline-block px-2 py-1 rounded mr-2 ${
+                                    task.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                    task.priority === 'medium' ? 'bg-amber-100 text-amber-800' :
+                                    'bg-green-100 text-green-800'
+                                  }`}>
+                                    {task.priority?.toUpperCase()}
+                                  </span>
+                                  <span className="text-slate-600">Cost: {task.estimatedCost}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {tireAnalysisData.analysis?.recommendations && tireAnalysisData.analysis.recommendations.length > 0 && (
+                        <div className="bg-white rounded-lg p-4">
+                          <h3 className="font-semibold text-slate-900 mb-2">Recommendations</h3>
+                          <ul className="list-disc list-inside space-y-1">
+                            {tireAnalysisData.analysis.recommendations.map((rec, idx) => (
+                              <li key={idx} className="text-slate-700 text-sm">{rec}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {tireAnalysisData.analysis?.maintenanceTimeline && (
+                        <div className="bg-white rounded-lg p-4">
+                          <h3 className="font-semibold text-slate-900 mb-2">Maintenance Timeline</h3>
+                          <p className="text-slate-700 text-sm">{tireAnalysisData.analysis.maintenanceTimeline}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Save Buttons */}
                 <div className="mt-4 flex gap-2">
                   <button className="button" onClick={saveEverything}>
-                    Save everything
-                  </button>
-                  {/* still keep old manual-only button if you want */}
-                  <button className="button bg-indigo-600 hover:bg-indigo-700" onClick={saveEverything}>
-                    Save manual only
+                    Save Everything
                   </button>
                 </div>
-              </div> }
-
-
-            </div>
+              </div>
+            )}
           </main>
         </div>
       } />
