@@ -4,6 +4,7 @@ import { Link, Routes, Route } from "react-router-dom";
 import Header from "./components/Header";
 import VehicleInfo from "./components/VehicleInfo";
 import ManualDataForm from "./components/ManualDataForm";
+import VehicleDashboard from "./components/VehicleDashboard";
 import { db } from "./firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { fetchVehicleDataFromLicensePlate } from "./services/aiBrowser";
@@ -243,67 +244,15 @@ const saveEverything = async () => {
               </div>
             )}
 
-            {/* Results Display */}
+            {/* Results Display - Vehicle Dashboard */}
             {!loading && vehicleData && (
-              <div className="lg:col-span-2 space-y-6">
-                
-                {/* Vehicle Data Section */}
-                <div className="bg-blue-50 rounded-lg shadow-lg p-6 border border-blue-200">
-                  <h2 className="text-2xl font-bold text-blue-900 mb-4 flex items-center gap-2">
-                    Vehicle Information
-                    <span className="text-sm font-normal text-blue-700">
-                      ({vehicleData.source || "Unknown Source"})
-                    </span>
-                  </h2>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Basic Info */}
-                    <div className="bg-white rounded-lg p-4">
-                      <h3 className="font-semibold text-slate-900 mb-3">Basic Information</h3>
-                      <div className="space-y-2 text-sm">
-                        {vehicleData.make && <div><span className="font-medium text-slate-700">Make:</span> {vehicleData.make}</div>}
-                        {vehicleData.model && <div><span className="font-medium text-slate-700">Model:</span> {vehicleData.model}</div>}
-                        {vehicleData.year && <div><span className="font-medium text-slate-700">Year:</span> {vehicleData.year}</div>}
-                        {vehicleData.bodyType && <div><span className="font-medium text-slate-700">Body Type:</span> {vehicleData.bodyType}</div>}
-                        {vehicleData.color && <div><span className="font-medium text-slate-700">Color:</span> {vehicleData.color}</div>}
-                        {vehicleData.condition && <div><span className="font-medium text-slate-700">Condition:</span> {vehicleData.condition}</div>}
-                      </div>
-                    </div>
-
-                    {/* Additional Details */}
-                    <div className="bg-white rounded-lg p-4">
-                      <h3 className="font-semibold text-slate-900 mb-3">Additional Details</h3>
-                      <div className="space-y-2 text-sm">
-                        {vehicleData.mileageEstimate && <div><span className="font-medium text-slate-700">Estimated Mileage:</span> {vehicleData.mileageEstimate}</div>}
-                        {vehicleData.transmission && <div><span className="font-medium text-slate-700">Transmission:</span> {vehicleData.transmission}</div>}
-                        {vehicleData.fuelType && <div><span className="font-medium text-slate-700">Fuel Type:</span> {vehicleData.fuelType}</div>}
-                        {vehicleData.estimatedValue && <div><span className="font-medium text-slate-700">Estimated Value:</span> {vehicleData.estimatedValue}</div>}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* View Full JSON */}
-                  <details className="mt-4">
-                    <summary className="cursor-pointer font-semibold text-slate-700 hover:text-slate-900">
-                      View Full Data (JSON)
-                    </summary>
-                    <div className="bg-white rounded-lg p-4 mt-2 max-h-96 overflow-y-auto">
-                      <pre className="text-xs text-slate-700 whitespace-pre-wrap break-words">
-                        {JSON.stringify(vehicleData, null, 2)}
-                      </pre>
-                    </div>
-                  </details>
-                </div>
-
-
-
-                {/* Save Buttons */}
-                <div className="mt-4 flex gap-2">
-                  <button className="button" onClick={saveEverything}>
-                    Save Everything
-                  </button>
-                </div>
-              </div>
+              <VehicleDashboard 
+                vehicleData={vehicleData} 
+                onAnalyzeAgain={() => {
+                  setVehicleData(null);
+                  setVehicleImages([]);
+                }}
+              />
             )}
           </main>
         </div>

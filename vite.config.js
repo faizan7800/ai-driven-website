@@ -6,12 +6,20 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api/vegvesen': {
-        target: 'https://kjoretoyoppslag.atlas.vegvesen.no',
+      // Proxy your staging backend — fixes CORS for license plate lookups
+      '/api/vehicle': {
+        target: 'https://stagging-fori-hayk-backend.fori.co',
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/vehicle/, ''),
         secure: true,
-        rewrite: path => path.replace(/^\/api\/vegvesen/, '')
-      }
-    }
-  }
+      },
+      // Proxy OpenAI — fixes CORS + keeps your API key off the browser
+      '/api/openai': {
+        target: 'https://api.openai.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/openai/, ''),
+        secure: true,
+      },
+    },
+  },
 })
