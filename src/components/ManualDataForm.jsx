@@ -349,13 +349,14 @@ const MAINT_TYPES = [
   // New state for tire analysis, initialized from manualData for persistence
   const [tireAnalysis, setTireAnalysis] = useState(manualData.tireAnalysis?.analysis || null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  // New state for analysis input fields, initialized from manualData for persistence
+  const [healthAnalysisImages, setHealthAnalysisImages] = useState([]);
+  
   // Auto-populate vehicle type with make + model from API data if available
   const apiMake = vehicleData?.merke || vehicleData?.make || vehicleMake;
   const apiModel = vehicleData?.handelsbetegnelse || vehicleData?.model || vehicleModel;
   const autoVehicleType = apiMake && apiModel ? `${apiMake} ${apiModel}` : '';
   
-  const [vehicleType, setVehicleType] = useState(manualData.tireAnalysis?.vehicleType || autoVehicleType || '');
+  const [vehicleType, setVehicleType] = useState(manualData.tireAnalysis?.vehicleType || '');
   const [mileage, setMileage] = useState(manualData.tireAnalysis?.mileage || '');
   const [fireStoreVehiclesData, setFireStoreVehiclesData] = useState(null); // State to hold Firestore data for the vehicle
   const [apiVehicleData, setApiVehicleData] = useState(null); // State to hold API vehicle data
@@ -366,11 +367,17 @@ const MAINT_TYPES = [
   const make = vehicleMake;
   const model = vehicleModel;
 
+  // Auto-populate vehicle type from API data when component mounts or vehicleData changes
+  useEffect(() => {
+    if (autoVehicleType && !vehicleType) {
+      setVehicleType(autoVehicleType);
+    }
+  }, [autoVehicleType]);
+
   // Sync state from parent's manualData.tireAnalysis on initial load/update
   useEffect(() => {
     if (manualData.tireAnalysis) {
       setTireAnalysis(manualData.tireAnalysis.analysis || null);
-      setVehicleType(manualData.tireAnalysis.vehicleType || '');
       setMileage(manualData.tireAnalysis.mileage || '');
     } else {
       // If parent clears the analysis, clear local state too
@@ -851,21 +858,24 @@ const MAINT_TYPES = [
                       const files = Array.from(e.target.files || []);
                       if (files.length > 5) {
                         alert("Maximum 5 images allowed. Only the first 5 will be used.");
+                        setHealthAnalysisImages(files.slice(0, 5));
+                      } else {
+                        setHealthAnalysisImages(files);
                       }
                     }}
-                    disabled={tireImages.length >= 5}
+                    disabled={healthAnalysisImages.length >= 5}
                     className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
                   />
-                  {tireImages.length > 0 && (
+                  {healthAnalysisImages.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {tireImages.map((img, idx) => (
+                      {healthAnalysisImages.map((img, idx) => (
                         <div key={idx} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                           {img.name.substring(0, 20)}...
                         </div>
                       ))}
                     </div>
                   )}
-                  {tireImages.length === 0 && (
+                  {healthAnalysisImages.length === 0 && (
                     <p className="text-xs text-red-500 mt-1">At least 1 image is required</p>
                   )}
                 </div>
@@ -874,9 +884,9 @@ const MAINT_TYPES = [
                 <div className="border-t border-slate-200 py-4 space-y-4">
                   <button
                     onClick={runTireAnalysis}
-                    disabled={isAnalyzing || !vehicleType || !mileage || tireImages.length === 0}
+                    disabled={isAnalyzing || !vehicleType || healthAnalysisImages.length === 0}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-white font-medium transition-colors ${
-                      isAnalyzing || !vehicleType || !mileage || tireImages.length === 0
+                      isAnalyzing || !vehicleType || healthAnalysisImages.length === 0
                         ? "bg-gray-400 cursor-not-allowed"
                         : "bg-blue-600 hover:bg-blue-700"
                     }`}
@@ -887,14 +897,14 @@ const MAINT_TYPES = [
                       </>
                     ) : (
                       <>
-                        <Zap size={18} /> Fetch Vehicle Data & Analyze
+                        <Zap size={18} /> Analyze Vehicle Health
                       </>
                     )}
                   </button>
                   <p className="text-xs text-slate-500 text-center">
-                    {tireImages.length === 0 
+                    {healthAnalysisImages.length === 0 
                       ? "Upload at least 1 image to analyze"
-                      : `Ready to analyze with ${tireImages.length} image(s)`
+                      : `Ready to analyze with ${healthAnalysisImages.length} image(s)`
                     }
                   </p>
                 </div>

@@ -95,9 +95,12 @@ const saveEverything = async () => {
       tireAnalysis: tireAnalysisData
     });
 
+    // Clean vehicleData to remove undefined values
+    const cleanedApiData = cleanObject(vehicleData || {});
+
     const payload = {
       plate,
-      apiData: vehicleData,
+      apiData: cleanedApiData,
       manualData: dataToSave,
       savedAt: new Date().toISOString(),
     };
@@ -287,7 +290,14 @@ const saveEverything = async () => {
       } />
       <Route path="/list" element={<ListPage />} />
       <Route path="/plate/:plate" element={<PlateDetailPage />} />
-      <Route path="/history" element={<HistoryPage />} />
+      <Route path="/history" element={
+        <div className="min-h-screen bg-gray-50">
+          <Header />
+          <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+            <HistoryPage />
+          </main>
+        </div>
+      } />
     </Routes>
   );
 }
