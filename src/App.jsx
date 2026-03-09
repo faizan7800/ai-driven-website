@@ -246,15 +246,39 @@ const saveEverything = async () => {
               </div>
             )}
 
-            {/* Results Display - Vehicle Dashboard */}
+            {/* Results Display - Vehicle Dashboard and Manual Data Form */}
             {!loading && vehicleData && (
-              <VehicleDashboard 
-                vehicleData={vehicleData} 
-                onAnalyzeAgain={() => {
-                  setVehicleData(null);
-                  setVehicleImages([]);
-                }}
-              />
+              <div className="lg:col-span-2 space-y-8">
+                {/* API Vehicle Data Dashboard */}
+                <VehicleDashboard 
+                  vehicleData={vehicleData} 
+                  onAnalyzeAgain={() => {
+                    setVehicleData(null);
+                    setVehicleImages([]);
+                  }}
+                />
+                
+                {/* Manual Data Entry Form */}
+                <div className="bg-white rounded-lg shadow-lg p-6">
+                  <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b pb-4">Add Manual Vehicle Information</h2>
+                  <ManualDataForm 
+                    manualData={manualData} 
+                    setManualData={setManualData} 
+                    plate={plate}
+                    onAnalysisComplete={handleAnalysisComplete}
+                  />
+                  
+                  {/* Save Button */}
+                  <div className="mt-6 pt-6 border-t border-slate-200">
+                    <button 
+                      onClick={saveEverything}
+                      className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition font-semibold"
+                    >
+                      Save All Vehicle Data
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </main>
         </div>

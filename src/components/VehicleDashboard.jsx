@@ -148,38 +148,7 @@ export default function VehicleDashboard({ vehicleData, onAnalyzeAgain }) {
         </Section>
       )}
 
-      {/* Manual Data Entry Section */}
-      <Section title="Add Manual Notes">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Additional Notes</label>
-            <textarea
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Add any additional information about this vehicle..."
-              rows="4"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Mileage</label>
-              <input
-                type="number"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Current mileage in km"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Inspection Date</label>
-              <input
-                type="date"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
-      </Section>
-
-      {/* Action Buttons */}
+      {/* Action Button */}
       {onAnalyzeAgain && (
         <div className="flex gap-3 mt-8 pt-6 border-t border-slate-200">
           <button
@@ -187,11 +156,6 @@ export default function VehicleDashboard({ vehicleData, onAnalyzeAgain }) {
             className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-semibold text-sm"
           >
             Analyze Again with Different Photos
-          </button>
-          <button
-            className="flex-1 bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition font-semibold text-sm"
-          >
-            Save Vehicle Data
           </button>
         </div>
       )}
