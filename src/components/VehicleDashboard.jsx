@@ -11,144 +11,173 @@ export default function VehicleDashboard({ vehicleData, onAnalyzeAgain }) {
   );
 
   const InfoRow = ({ label, value }) => (
-    <div className="grid grid-cols-2 gap-4 mb-3 pb-3 border-b border-slate-100 last:border-0">
+    <div className="grid grid-cols-3 gap-4 mb-3 pb-3 border-b border-slate-100 last:border-0">
       <span className="text-sm text-slate-600">{label}</span>
-      <span className="text-sm font-medium text-slate-900">{value || "N/A"}</span>
+      <span className="text-sm font-medium text-slate-900 col-span-2">{value || "N/A"}</span>
     </div>
   );
+
+  const { kjennemerke, understellsnummer, kuid, personligKjennemerke, registrering, tekniskKjoretoy, periodiskKjoretoykontroll } = vehicleData;
 
   return (
     <div className="space-y-6">
       {/* Identifiers Section */}
       <Section title="Identifiers">
-        <InfoRow label="License plate" value={vehicleData.licensePlate} />
-        <InfoRow label="VIN" value={vehicleData.vin} />
-        <InfoRow label="KUID" value={vehicleData.kuid} />
-        <InfoRow label="Personal plate" value={vehicleData.personalPlate} />
-        <InfoRow label="Import used" value={vehicleData.importUsed} />
+        <InfoRow label="License plate" value={kjennemerke} />
+        <InfoRow label="VIN (Chassis number)" value={understellsnummer} />
+        <InfoRow label="KUID" value={kuid} />
+        <InfoRow label="Personal licence plate" value={personligKjennemerke || "No"} />
       </Section>
 
       {/* Registration Section */}
-      <Section title="Registration">
-        <InfoRow label="First registration (any country)" value={vehicleData.firstRegistration} />
-        <InfoRow label="First registration Norway" value={vehicleData.firstRegistrationNorway} />
-        <InfoRow label="Latest registration change" value={vehicleData.latestRegistrationChange} />
-      </Section>
-
-      {/* Car Lease Info Section */}
-      {vehicleData.lease && (
-        <Section title="Car Lease Info">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-slate-500 mb-2">Lease start</p>
-              <p className="text-sm font-medium text-slate-900">{vehicleData.lease.leaseStart || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-2">Lease end</p>
-              <p className="text-sm font-medium text-slate-900">{vehicleData.lease.leaseEnd || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-2">Lease payment</p>
-              <p className="text-sm font-medium text-slate-900">{vehicleData.lease.leasePayment || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-2">Payment date</p>
-              <p className="text-sm font-medium text-slate-900">{vehicleData.lease.paymentDate || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-2">Payment responsible</p>
-              <p className="text-sm font-medium text-slate-900">{vehicleData.lease.paymentResponsible || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-2">Leaser provider</p>
-              <p className="text-sm font-medium text-slate-900">{vehicleData.lease.leaserProvider || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-2">Lease receiver</p>
-              <p className="text-sm font-medium text-slate-900">{vehicleData.lease.leaseReceiver || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-2">Returned lessor</p>
-              <p className="text-sm font-medium text-slate-900">{vehicleData.lease.returnedLessor || "N/A"}</p>
-            </div>
-          </div>
+      {registrering && (
+        <Section title="Registration">
+          <InfoRow label="Registration status" value={registrering.registreringsstatus} />
+          <InfoRow label="Status date" value={registrering.registreringsstatusDato} />
+          <InfoRow label="First registration (any country)" value={registrering.forstegangsregistrering} />
+          <InfoRow label="First registration Norway" value={registrering.forstegangsregistreringNorge} />
+          <InfoRow label="First registration owner" value={registrering.forstegangsregistreringEier} />
+          <InfoRow label="Number plate colors" value={registrering.kjennemerkefarge} />
+          <InfoRow label="Registered with dealer" value={registrering.isAvregistrertHosBilforhandler ? "Yes" : "No"} />
         </Section>
       )}
 
-      {/* Insurance Section */}
-      {vehicleData.insurance && (
-        <Section title="Insurance">
-          <InfoRow label="Provider" value={vehicleData.insurance.provider} />
-          <InfoRow label="Claim procedure URL" value={vehicleData.insurance.claimProcedureUrl} />
-          <InfoRow label="Claim contact" value={vehicleData.insurance.claimContact} />
-          <InfoRow label="Insurance Expiry Date" value={vehicleData.insurance.insuranceExpiryDate} />
+      {/* Periodic Vehicle Control Section */}
+      {periodiskKjoretoykontroll && (
+        <Section title="Periodic Vehicle Control (Inspection)">
+          <InfoRow label="Last inspected" value={periodiskKjoretoykontroll.sistKontrollert || "Not inspected"} />
+          <InfoRow label="Next inspection due" value={periodiskKjoretoykontroll.nesteKontroll} />
         </Section>
       )}
 
-      {/* Technical Section */}
-      {vehicleData.technical && (
-        <Section title="Technical">
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-slate-500 mb-2">Make</p>
-                <p className="text-sm font-medium text-slate-900">{vehicleData.technical.make || "N/A"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-2">Model</p>
-                <p className="text-sm font-medium text-slate-900">{vehicleData.technical.model || "N/A"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-2">Version</p>
-                <p className="text-sm font-medium text-slate-900">{vehicleData.technical.version || "N/A"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-2">Type</p>
-                <p className="text-sm font-medium text-slate-900">{vehicleData.technical.type || "N/A"}</p>
+      {/* Technical Vehicle Section */}
+      {tekniskKjoretoy && (
+        <Section title="Technical Information">
+          <div className="space-y-6">
+            {/* Basic Info */}
+            <div>
+              <h4 className="font-semibold text-slate-900 mb-3">Basic Info</h4>
+              <div className="space-y-3">
+                <InfoRow label="Make" value={tekniskKjoretoy.merke} />
+                <InfoRow label="Model" value={tekniskKjoretoy.handelsbetegnelse} />
+                <InfoRow label="Type designation" value={tekniskKjoretoy.typebetegnelse} />
+                <InfoRow label="Euro class" value={tekniskKjoretoy.miljoEuroklasse} />
+                <InfoRow label="Vehicle category" value={tekniskKjoretoy.tekniskKode} />
               </div>
             </div>
 
+            {/* Dimensions */}
             <div className="border-t pt-4">
               <h4 className="font-semibold text-slate-900 mb-3">Dimensions</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <InfoRow label="Length (mm)" value={vehicleData.technical.lengthMm} />
-                <InfoRow label="Width (mm)" value={vehicleData.technical.widthMm} />
-                <InfoRow label="Height (mm)" value={vehicleData.technical.heightMm} />
-                <InfoRow label="Weight unladen (kg)" value={vehicleData.technical.weightUnladenKg} />
+              <div className="space-y-3">
+                <InfoRow label="Length (mm)" value={tekniskKjoretoy.lengde} />
+                <InfoRow label="Width (mm)" value={tekniskKjoretoy.bredde} />
+                <InfoRow label="Height (mm)" value={tekniskKjoretoy.hoyde} />
               </div>
             </div>
 
+            {/* Weights */}
+            {tekniskKjoretoy.lastegenskaper && (
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-slate-900 mb-3">Weight & Load Capacity</h4>
+                <div className="space-y-3">
+                  <InfoRow label="Unladen weight (kg)" value={tekniskKjoretoy.lastegenskaper.egenvekt} />
+                  <InfoRow label="Maximum total weight (kg)" value={tekniskKjoretoy.lastegenskaper.tillattTotalvekt} />
+                  <InfoRow label="Payload (kg)" value={tekniskKjoretoy.lastegenskaper.nyttelast} />
+                  <InfoRow label="Max trailer weight with brakes (kg)" value={tekniskKjoretoy.lastegenskaper.tillattTilhengervektMedBrems} />
+                  <InfoRow label="Max trailer weight without brakes (kg)" value={tekniskKjoretoy.lastegenskaper.tillattTilhengervektUtenBrems} />
+                </div>
+              </div>
+            )}
+
+            {/* Seating & Performance */}
             <div className="border-t pt-4">
-              <h4 className="font-semibold text-slate-900 mb-3">Engine</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <InfoRow label="Displacement (cc)" value={vehicleData.technical.displacementCc} />
-                <InfoRow label="Max power (kW)" value={vehicleData.technical.maxPowerKw} />
-                <InfoRow label="Fuel type" value={vehicleData.technical.fuelType} />
-                <InfoRow label="Euro class" value={vehicleData.technical.euroClass} />
+              <h4 className="font-semibold text-slate-900 mb-3">Seating & Performance</h4>
+              <div className="space-y-3">
+                <InfoRow label="Seating capacity" value={tekniskKjoretoy.sitteplasser} />
+                <InfoRow label="Maximum speed (km/h)" value={tekniskKjoretoy.maksimumHastighet} />
+                <InfoRow label="Gearbox" value={tekniskKjoretoy.girkasse} />
               </div>
             </div>
 
-            <div className="border-t pt-4">
-              <h4 className="font-semibold text-slate-900 mb-3">Other Info</h4>
-              <InfoRow label="Driving ban" value={vehicleData.technical.drivingBan ? "Yes" : "No"} />
-            </div>
+            {/* Color */}
+            {tekniskKjoretoy.karosseri && (
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-slate-900 mb-3">Color</h4>
+                <div className="space-y-3">
+                  <InfoRow label="Color" value={tekniskKjoretoy.karosseri.farge} />
+                  <InfoRow label="Color code" value={tekniskKjoretoy.karosseri.fargekode} />
+                </div>
+              </div>
+            )}
+
+            {/* Engine & Fuel */}
+            {tekniskKjoretoy.motorer && tekniskKjoretoy.motorer.length > 0 && (
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-slate-900 mb-3">Engine</h4>
+                {tekniskKjoretoy.motorer.map((motor, idx) => (
+                  <div key={idx} className="space-y-3">
+                    {motor.drivstoff && motor.drivstoff.length > 0 && (
+                      <>
+                        <InfoRow label="Fuel type" value={motor.drivstoff[0]?.drivstofftype} />
+                        <InfoRow label="Power (kW)" value={motor.drivstoff[0]?.effekt} />
+                        <InfoRow label="Max power per hour (kW)" value={motor.drivstoff[0]?.maksEffektPerTime} />
+                        <InfoRow label="Range (km)" value={motor.drivstoff[0]?.rekkeviddeKm} />
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tires & Wheels */}
+            {tekniskKjoretoy.aksler?.dekkOgFelger && tekniskKjoretoy.aksler.dekkOgFelger.length > 0 && (
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-slate-900 mb-3">Tires & Wheels</h4>
+                {tekniskKjoretoy.aksler.dekkOgFelger.map((dekk, idx) => (
+                  <div key={idx} className="mb-4 pb-4 border-b last:border-0">
+                    <InfoRow label={`Axle ${dekk.akselId} - Tire size`} value={dekk.dekkdimensjon} />
+                    <InfoRow label={`Axle ${dekk.akselId} - Rim size`} value={dekk.felgdimensjon} />
+                    <InfoRow label={`Axle ${dekk.akselId} - Load index`} value={dekk.belastningskode} />
+                    <InfoRow label={`Axle ${dekk.akselId} - Speed index`} value={dekk.hastighetskode} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </Section>
       )}
 
-      {/* Additional Info */}
-      {vehicleData.additional && (
-        <Section title="Additional Information">
-          <InfoRow label="Colour" value={vehicleData.additional.colour} />
-          <InfoRow label="Description" value={vehicleData.additional.description} />
-          <InfoRow label="Code" value={vehicleData.additional.code} />
-          {vehicleData.additional.drivingBan && (
-            <div className="bg-red-50 border border-red-200 rounded p-3">
-              <p className="text-sm text-red-800 font-medium">⚠️ Driving ban in effect</p>
+      {/* Manual Data Entry Section */}
+      <Section title="Add Manual Notes">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Additional Notes</label>
+            <textarea
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Add any additional information about this vehicle..."
+              rows="4"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Mileage</label>
+              <input
+                type="number"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Current mileage in km"
+              />
             </div>
-          )}
-        </Section>
-      )}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Inspection Date</label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+      </Section>
 
       {/* Action Buttons */}
       {onAnalyzeAgain && (

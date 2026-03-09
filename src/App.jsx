@@ -48,12 +48,14 @@ function App() {
       
       if (apiResult.success && apiResult.data) {
         console.log("[v0] API data retrieved successfully");
+        // Extract vehicleData key from the API response
+        const vehicleDataFromAPI = apiResult.data.vehicleData || apiResult.data;
         setVehicleData({
-          ...apiResult.data,
+          ...vehicleDataFromAPI,
           source: "API",
           licensePlate: currentPlate,
-          make: vehicleMake || apiResult.data.make,
-          model: vehicleModel || apiResult.data.model
+          make: vehicleMake || vehicleDataFromAPI.merke,
+          model: vehicleModel || vehicleDataFromAPI.handelsbetegnelse
         });
       } else {
         console.error("[v0] API error:", apiResult.error);
