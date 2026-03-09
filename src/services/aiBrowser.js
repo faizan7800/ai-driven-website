@@ -272,11 +272,12 @@ export const fetchVehicleDataFromLicensePlate = async (licensePlate, make = "", 
 
     // Encode the license plate for URL
     const encodedPlate = encodeURIComponent(licensePlate);
-    const apiUrl = `https://stagging-fori-hayk-backend.fori.co/getVehicleDataFromLicensePlate/${encodedPlate}`;
+    // Use proxy endpoint to avoid CORS issues
+    const proxyUrl = `/api/vehicle/getVehicleDataFromLicensePlate/${encodedPlate}`;
 
-    console.log("[v0] Fetching vehicle data from:", apiUrl);
+    console.log("[v0] Fetching vehicle data from proxy:", proxyUrl);
 
-    const response = await axios.get(apiUrl);
+    const response = await axios.get(proxyUrl);
     
     if (response.data) {
       console.log("[v0] Vehicle data fetched successfully:", response.data);
