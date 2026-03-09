@@ -12,6 +12,7 @@ import { fetchVehicleDataFromLicensePlate } from "./services/aiBrowser";
 // Import other components (assuming they exist)
 import ListPage from "./pages/ListPage";
 import PlateDetailPage from "./pages/PlateDetailPage";
+import HistoryPage from "./pages/HistoryPage";
 
 function App() {
   const [plate, setPlate] = useState("");
@@ -266,6 +267,7 @@ const saveEverything = async () => {
                     setManualData={setManualData} 
                     plate={plate}
                     onAnalysisComplete={handleAnalysisComplete}
+                    vehicleData={vehicleData}
                   />
                   
                   {/* Save Button */}
@@ -284,7 +286,8 @@ const saveEverything = async () => {
         </div>
       } />
       <Route path="/list" element={<ListPage />} />
-      <Route path="/plate/:plate" element={<PlateDetailPage />} /> 
+      <Route path="/plate/:plate" element={<PlateDetailPage />} />
+      <Route path="/history" element={<HistoryPage />} />
     </Routes>
   );
 }

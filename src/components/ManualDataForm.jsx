@@ -275,7 +275,7 @@ const TireAnalysisResults = ({ analysis, onAnalyzeAgain }) => {
 
 // --- Main Component ---
 
-export default function ManualDataForm({ manualData = {}, setManualData, plate = "", readOnly = false, onAnalysisComplete, vehicleImages = [], vehicleMake = "", vehicleModel = "" }) { // Added image and make/model props
+export default function ManualDataForm({ manualData = {}, setManualData, plate = "", readOnly = false, onAnalysisComplete, vehicleImages = [], vehicleMake = "", vehicleModel = "", vehicleData = null }) { // Added vehicleData prop from API
   const {t} = useTranslation('mdf');
   const [workshops, setWorkshops] = useState([])
   const [leaseFile, setLeaseFile] = useState(null)
@@ -350,7 +350,12 @@ const MAINT_TYPES = [
   const [tireAnalysis, setTireAnalysis] = useState(manualData.tireAnalysis?.analysis || null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   // New state for analysis input fields, initialized from manualData for persistence
-  const [vehicleType, setVehicleType] = useState(manualData.tireAnalysis?.vehicleType || '');
+  // Auto-populate vehicle type with make + model from API data if available
+  const apiMake = vehicleData?.merke || vehicleData?.make || vehicleMake;
+  const apiModel = vehicleData?.handelsbetegnelse || vehicleData?.model || vehicleModel;
+  const autoVehicleType = apiMake && apiModel ? `${apiMake} ${apiModel}` : '';
+  
+  const [vehicleType, setVehicleType] = useState(manualData.tireAnalysis?.vehicleType || autoVehicleType || '');
   const [mileage, setMileage] = useState(manualData.tireAnalysis?.mileage || '');
   const [fireStoreVehiclesData, setFireStoreVehiclesData] = useState(null); // State to hold Firestore data for the vehicle
   const [apiVehicleData, setApiVehicleData] = useState(null); // State to hold API vehicle data
@@ -831,7 +836,39 @@ const MAINT_TYPES = [
                     </div>
                 </div>
 
-
+                {/* Image Upload Section */}
+                <div className="space-y-2">
+                  <label className="flex items-center text-sm font-semibold text-slate-700 mb-2">
+                    <Upload className="w-4 h-4 mr-2 text-blue-600" />
+                    {t('upload_images_label') || 'Upload Vehicle Images'} <span className="text-red-600">*</span> (Min 1 - Max 5)
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">Upload clear photos for vehicle health analysis</p>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length > 5) {
+                        alert("Maximum 5 images allowed. Only the first 5 will be used.");
+                      }
+                    }}
+                    disabled={tireImages.length >= 5}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  />
+                  {tireImages.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {tireImages.map((img, idx) => (
+                        <div key={idx} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          {img.name.substring(0, 20)}...
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {tireImages.length === 0 && (
+                    <p className="text-xs text-red-500 mt-1">At least 1 image is required</p>
+                  )}
+                </div>
 
                 {/* Analyze Button */}
                 <div className="border-t border-slate-200 py-4 space-y-4">

@@ -1,5 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
+import { Clock } from "lucide-react";
 import LanguageSwitcher from "./LanguageSwitcher";
 
 export default function Header() {
@@ -13,7 +15,16 @@ export default function Header() {
       </h1>
 
       {/* Right side */}
-      <LanguageSwitcher />
+      <div className="flex items-center gap-6">
+        <Link 
+          to="/history" 
+          className="flex items-center gap-2 text-slate-600 hover:text-blue-600 transition font-medium"
+        >
+          <Clock size={20} />
+          History
+        </Link>
+        <LanguageSwitcher />
+      </div>
     </header>
   );
 }
