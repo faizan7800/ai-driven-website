@@ -843,50 +843,35 @@ const MAINT_TYPES = [
                     </div>
                 </div>
 
-                {/* Image Upload Section */}
-                <div className="space-y-2">
-                  <label className="flex items-center text-sm font-semibold text-slate-700 mb-2">
-                    <Upload className="w-4 h-4 mr-2 text-blue-600" />
-                    {t('upload_images_label') || 'Upload Vehicle Images'} <span className="text-red-600">*</span> (Min 1 - Max 5)
-                  </label>
-                  <p className="text-xs text-slate-500 mb-2">Upload clear photos for vehicle health analysis</p>
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files || []);
-                      if (files.length > 5) {
-                        alert("Maximum 5 images allowed. Only the first 5 will be used.");
-                        setHealthAnalysisImages(files.slice(0, 5));
-                      } else {
-                        setHealthAnalysisImages(files);
-                      }
-                    }}
-                    disabled={healthAnalysisImages.length >= 5}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
-                  />
-                  {healthAnalysisImages.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {healthAnalysisImages.map((img, idx) => (
-                        <div key={idx} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                {/* Images from First Page Display */}
+                {vehicleImages && vehicleImages.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="flex items-center text-sm font-semibold text-slate-700 mb-2">
+                      <Upload className="w-4 h-4 mr-2 text-green-600" />
+                      Uploaded Images {vehicleImages.length > 0 && `(${vehicleImages.length})`}
+                    </label>
+                    <div className="flex flex-wrap gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                      {vehicleImages.map((img, idx) => (
+                        <div key={idx} className="text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full">
                           {img.name.substring(0, 20)}...
                         </div>
                       ))}
                     </div>
-                  )}
-                  {healthAnalysisImages.length === 0 && (
-                    <p className="text-xs text-red-500 mt-1">At least 1 image is required</p>
-                  )}
-                </div>
+                  </div>
+                )}
+                {!vehicleImages || vehicleImages.length === 0 && (
+                  <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                    <p className="text-xs text-red-700">No images uploaded. Please upload at least 1 image from the first step.</p>
+                  </div>
+                )}
 
                 {/* Analyze Button */}
                 <div className="border-t border-slate-200 py-4 space-y-4">
                   <button
                     onClick={runTireAnalysis}
-                    disabled={isAnalyzing || !vehicleType || healthAnalysisImages.length === 0}
+                    disabled={isAnalyzing || !vehicleType || !vehicleImages || vehicleImages.length === 0}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-white font-medium transition-colors ${
-                      isAnalyzing || !vehicleType || healthAnalysisImages.length === 0
+                      isAnalyzing || !vehicleType || !vehicleImages || vehicleImages.length === 0
                         ? "bg-gray-400 cursor-not-allowed"
                         : "bg-blue-600 hover:bg-blue-700"
                     }`}
@@ -897,14 +882,14 @@ const MAINT_TYPES = [
                       </>
                     ) : (
                       <>
-                        <Zap size={18} /> Analyze Vehicle Health
+                        <Zap size={18} /> Analyze Vehicle
                       </>
                     )}
                   </button>
                   <p className="text-xs text-slate-500 text-center">
-                    {healthAnalysisImages.length === 0 
-                      ? "Upload at least 1 image to analyze"
-                      : `Ready to analyze with ${healthAnalysisImages.length} image(s)`
+                    {!vehicleImages || vehicleImages.length === 0
+                      ? "Upload at least 1 image from the first step to analyze"
+                      : `Ready to analyze with ${vehicleImages.length} image(s)`
                     }
                   </p>
                 </div>

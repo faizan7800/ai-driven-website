@@ -255,11 +255,7 @@ const saveEverything = async () => {
               <div className="lg:col-span-2 space-y-8">
                 {/* API Vehicle Data Dashboard */}
                 <VehicleDashboard 
-                  vehicleData={vehicleData} 
-                  onAnalyzeAgain={() => {
-                    setVehicleData(null);
-                    setVehicleImages([]);
-                  }}
+                  vehicleData={vehicleData}
                 />
                 
                 {/* Manual Data Entry Form */}
@@ -271,6 +267,9 @@ const saveEverything = async () => {
                     plate={plate}
                     onAnalysisComplete={handleAnalysisComplete}
                     vehicleData={vehicleData}
+                    vehicleImages={vehicleImages}
+                    vehicleMake={vehicleMake}
+                    vehicleModel={vehicleModel}
                   />
                   
                   {/* Save Button */}

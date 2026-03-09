@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function VehicleDashboard({ vehicleData, onAnalyzeAgain }) {
+export default function VehicleDashboard({ vehicleData }) {
   if (!vehicleData) return null;
 
   const Section = ({ title, children }) => (
@@ -148,17 +148,7 @@ export default function VehicleDashboard({ vehicleData, onAnalyzeAgain }) {
         </Section>
       )}
 
-      {/* Action Button */}
-      {onAnalyzeAgain && (
-        <div className="flex gap-3 mt-8 pt-6 border-t border-slate-200">
-          <button
-            onClick={onAnalyzeAgain}
-            className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition font-semibold text-sm"
-          >
-            Analyze Again with Different Photos
-          </button>
-        </div>
-      )}
+
     </div>
   );
 }
