@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { collection, getDocs } from "firebase/firestore" // Removed addDoc
 import { db } from "../firebase"
-import { askOpenAI, uploadCloudinaryUnsigned, analyzeVehicleImages } from "../services/aiBrowser"
+import { askOpenAI, uploadCloudinaryUnsigned, analyzeVehicleImages, fetchVehicleDataFromLicensePlate, extractVehicleDataFromImages } from "../services/aiBrowser"
 import { askChat } from "../services/api"
 import {
   AlertCircle,
@@ -275,7 +275,7 @@ const TireAnalysisResults = ({ analysis, onAnalyzeAgain }) => {
 
 // --- Main Component ---
 
-export default function ManualDataForm({ manualData = {}, setManualData, plate = "", readOnly = false, onAnalysisComplete }) { // Added onAnalysisComplete prop
+export default function ManualDataForm({ manualData = {}, setManualData, plate = "", readOnly = false, onAnalysisComplete, vehicleImages = [], vehicleMake = "", vehicleModel = "" }) { // Added image and make/model props
   const {t} = useTranslation('mdf');
   const [workshops, setWorkshops] = useState([])
   const [leaseFile, setLeaseFile] = useState(null)
@@ -348,12 +348,18 @@ const MAINT_TYPES = [
 
   // New state for tire analysis, initialized from manualData for persistence
   const [tireAnalysis, setTireAnalysis] = useState(manualData.tireAnalysis?.analysis || null);
-  const [tireImages, setTireImages] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   // New state for analysis input fields, initialized from manualData for persistence
   const [vehicleType, setVehicleType] = useState(manualData.tireAnalysis?.vehicleType || '');
   const [mileage, setMileage] = useState(manualData.tireAnalysis?.mileage || '');
   const [fireStoreVehiclesData, setFireStoreVehiclesData] = useState(null); // State to hold Firestore data for the vehicle
+  const [apiVehicleData, setApiVehicleData] = useState(null); // State to hold API vehicle data
+  const [apiError, setApiError] = useState(null); // State to hold API errors
+  
+  // Use images and make/model from parent props
+  const tireImages = vehicleImages;
+  const make = vehicleMake;
+  const model = vehicleModel;
 
   // Sync state from parent's manualData.tireAnalysis on initial load/update
   useEffect(() => {
@@ -516,125 +522,95 @@ const MAINT_TYPES = [
     }
   }
 
-  // --- New Tire Analysis Logic ---
-
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length > 2) {
-      alert("Maximum 2 images allowed. Only the first 2 images will be used.");
-      setTireImages(files.slice(0, 2));
-    } else {
-      setTireImages(files);
-    }
-    setTireAnalysis(null); // Clear previous analysis
-    onAnalysisComplete(null); // Notify parent to clear saved analysis
-  };
+  // --- Tire Analysis Logic ---
 
   const runTireAnalysis = async () => {
-    if (!vehicleType || !mileage) {
-        alert("Please enter Vehicle Type and Mileage.");
+    if (!vehicleType || !mileage || tireImages.length === 0) {
+        alert("Please enter Vehicle Type, Mileage, and upload at least 1 image.");
         return;
     }
 
     setIsAnalyzing(true);
     setTireAnalysis(null);
+    setApiVehicleData(null);
+    setApiError(null);
 
     try {
-      let analysisResult;
-      
-      // If images are provided, use vision API analysis
-      if (tireImages.length > 0) {
-        console.log("Analyzing with vision API, images:", tireImages.length);
-        const visionResult = await analyzeVehicleImages(tireImages, vehicleType, mileage);
+      let vehicleData = null;
+      let vehicleDataSource = null;
+      let healthAnalysis = null;
+
+      console.log("[v0] Starting vehicle data fetch and analysis...");
+
+      // Step 1: Try to fetch from API first
+      if (plate) {
+        console.log("[v0] Attempting to fetch vehicle data from API for plate:", plate);
+        const apiResult = await fetchVehicleDataFromLicensePlate(plate, make, model);
         
-        if (visionResult.error) {
-          alert("Image analysis failed: " + visionResult.error);
-          setIsAnalyzing(false);
-          return;
+        if (apiResult.success && apiResult.data) {
+          console.log("[v0] API returned vehicle data successfully");
+          vehicleData = apiResult.data;
+          vehicleDataSource = "API";
+          setApiVehicleData(vehicleData);
+        } else {
+          console.log("[v0] API failed, will use AI extraction:", apiResult.error);
+          setApiError(apiResult.error);
         }
+      }
+
+      // Step 2: If API failed or no plate, extract vehicle data from images using AI
+      if (!vehicleData && tireImages.length > 0) {
+        console.log("[v0] Extracting vehicle data from images using AI...");
+        const extractionResult = await extractVehicleDataFromImages(tireImages, plate, make, model);
         
-        // Transform vision API result to match expected format
-        analysisResult = {
-          imageAnalysis: visionResult.imageAnalysis || "Analysis complete",
-          condition: visionResult.condition || "Vehicle condition assessed from images",
-          riskLevel: visionResult.riskLevel || "medium",
-          criticalIssues: visionResult.criticalIssues || [],
-          maintenance: visionResult.maintenance || [],
-          recommendations: visionResult.recommendations || [],
-          maintenanceTimeline: visionResult.maintenanceTimeline || "Based on condition"
-        };
-      } else {
-        // Fallback: Text-based analysis if no images
-        const prompt = `You are a vehicle maintenance expert. Analyze the maintenance needs for this vehicle and provide analysis in JSON format.
+        if (extractionResult.success && extractionResult.data) {
+          console.log("[v0] AI extraction successful");
+          vehicleData = extractionResult.data;
+          vehicleDataSource = "AI (Extracted from Images)";
+          setApiVehicleData(vehicleData);
+        } else {
+          console.error("[v0] AI extraction failed:", extractionResult.error);
+          setApiError(extractionResult.error || "Failed to extract vehicle data from images");
+        }
+      }
 
-Vehicle Details:
-- Type: ${vehicleType}
-- Current Mileage: ${mileage} km
-
-Please provide a comprehensive vehicle health report with the following JSON structure:
-{
-  "condition": "A brief summary of the vehicle condition and overall assessment",
-  "riskLevel": "low|medium|high",
-  "criticalIssues": ["issue1", "issue2"],
-  "maintenance": [
-    {
-      "task": "Task name",
-      "reason": "Why this task is necessary",
-      "priority": "low|medium|high",
-      "estimatedCost": "Approximate cost estimate"
-    }
-  ],
-  "recommendations": [
-    "Recommendation 1",
-    "Recommendation 2"
-  ],
-  "maintenanceTimeline": "When maintenance should be done"
-}
-
-Provide ONLY the JSON response without any additional text or markdown formatting.`;
-
-        const response = await askOpenAI(prompt);
+      // Step 3: Always perform maintenance/health analysis of the images
+      if (tireImages.length > 0) {
+        console.log("[v0] Performing health/maintenance analysis of vehicle images");
+        const healthResult = await analyzeVehicleImages(tireImages, vehicleType, mileage, make, model);
         
-        try {
-          const jsonMatch = response.match(/\{[\s\S]*\}/);
-          const jsonStr = jsonMatch ? jsonMatch[0] : response;
-          analysisResult = JSON.parse(jsonStr);
-        } catch (parseErr) {
-          console.error("Failed to parse OpenAI response:", parseErr);
-          analysisResult = {
-            condition: response,
-            riskLevel: "medium",
-            criticalIssues: [],
-            maintenance: [
-              {
-                task: "Vehicle Inspection",
-                reason: "Regular vehicle check recommended",
-                priority: "medium",
-                estimatedCost: "Varies by service center"
-              }
-            ],
-            recommendations: [
-              "Schedule regular maintenance",
-              "Follow manufacturer guidelines"
-            ],
-            maintenanceTimeline: "As per manufacturer schedule"
+        if (!healthResult.error) {
+          healthAnalysis = {
+            imageAnalysis: healthResult.imageAnalysis || "Analysis complete",
+            condition: healthResult.condition || "Vehicle condition assessed from images",
+            riskLevel: healthResult.riskLevel || "medium",
+            criticalIssues: healthResult.criticalIssues || [],
+            maintenance: healthResult.maintenance || [],
+            recommendations: healthResult.recommendations || [],
+            maintenanceTimeline: healthResult.maintenanceTimeline || "Based on condition"
           };
         }
       }
 
-      setTireAnalysis(analysisResult); 
-      
-      // Pass the analysis result up to the parent component for saving
+      // Set the analysis result
+      setTireAnalysis(healthAnalysis);
+
+      // Pass complete results to parent
       onAnalysisComplete({
         vehicleType,
         mileage,
+        make,
+        model,
+        licensePlate: plate,
         timestamp: new Date().toISOString(),
         imageCount: tireImages.length,
-        analysis: analysisResult,
+        vehicleData: vehicleData,
+        vehicleDataSource: vehicleDataSource,
+        healthAnalysis: healthAnalysis
       });
 
     } catch (e) {
-      console.error("Analysis Error:", e);
+      console.error("[v0] Analysis Error:", e);
       alert("Analysis failed. Please try again.");
     } finally {
       setIsAnalyzing(false);
@@ -644,8 +620,10 @@ Provide ONLY the JSON response without any additional text or markdown formattin
   const handleAnalyzeAgain = () => {
     setTireAnalysis(null);
     setTireImages([]);
+    setApiVehicleData(null);
+    setApiError(null);
     onAnalysisComplete(null); // Notify parent to clear saved analysis
-    // Keep vehicleType and mileage for convenience
+    // Keep vehicleType, mileage, make, and model for convenience
   };
 
   // --- Render Logic ---
@@ -850,45 +828,7 @@ Provide ONLY the JSON response without any additional text or markdown formattin
                     </div>
                 </div>
 
-                {/* Image Upload Section */}
-                <div className="border-y border-slate-200 py-4 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-3">
-                      📸 Upload Vehicle Images <span className="text-red-600">*</span> (Min 1 - Max 2 images)
-                    </label>
-                    <p className="text-xs text-slate-500 mb-2">Upload clear photos of tires, exterior, or interior for detailed AI analysis</p>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      disabled={tireImages.length >= 2}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
-                    />
-                    {tireImages.length > 0 && (
-                      <div className="mt-3">
-                        <p className="text-xs text-slate-600 mb-2">{tireImages.length} file(s) selected</p>
-                        <div className="flex flex-wrap gap-2">
-                          {tireImages.map((img, idx) => (
-                            <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-blue-100 rounded-full text-sm">
-                              <span>{img.name.substring(0, 15)}...</span>
-                              <button
-                                type="button"
-                                onClick={() => setTireImages(tireImages.filter((_, i) => i !== idx))}
-                                className="text-blue-600 hover:text-blue-800 font-bold"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {tireImages.length === 0 && (
-                      <p className="text-xs text-red-500 mt-2">At least 1 image is required for analysis</p>
-                    )}
-                  </div>
-                </div>
+
 
                 {/* Analyze Button */}
                 <div className="border-t border-slate-200 py-4 space-y-4">
@@ -907,7 +847,7 @@ Provide ONLY the JSON response without any additional text or markdown formattin
                       </>
                     ) : (
                       <>
-                        <Zap size={18} /> Run Vehicle Analysis
+                        <Zap size={18} /> Fetch Vehicle Data & Analyze
                       </>
                     )}
                   </button>
@@ -921,12 +861,92 @@ Provide ONLY the JSON response without any additional text or markdown formattin
               </>
             )}
 
+            {/* Vehicle Data Display (API or AI Extracted) */}
+            {apiVehicleData && (
+              <div className="space-y-4 p-6 bg-blue-50 rounded-xl shadow-lg border border-blue-200">
+                <h2 className="text-2xl font-bold text-blue-900 border-b pb-4 mb-4 flex items-center gap-2">
+                  <Car size={24} className="text-blue-600" /> 
+                  Vehicle Data
+                  <span className="text-sm font-normal text-blue-700 ml-2">
+                    ({apiVehicleData.source || "API"})
+                  </span>
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Key vehicle information */}
+                  <div className="bg-white rounded-lg p-4">
+                    <h3 className="font-semibold text-slate-900 mb-3">Basic Information</h3>
+                    <div className="space-y-2 text-sm">
+                      {apiVehicleData.make && (
+                        <div><span className="font-medium text-slate-700">Make:</span> {apiVehicleData.make}</div>
+                      )}
+                      {apiVehicleData.model && (
+                        <div><span className="font-medium text-slate-700">Model:</span> {apiVehicleData.model}</div>
+                      )}
+                      {apiVehicleData.year && (
+                        <div><span className="font-medium text-slate-700">Year:</span> {apiVehicleData.year}</div>
+                      )}
+                      {apiVehicleData.bodyType && (
+                        <div><span className="font-medium text-slate-700">Body Type:</span> {apiVehicleData.bodyType}</div>
+                      )}
+                      {apiVehicleData.color && (
+                        <div><span className="font-medium text-slate-700">Color:</span> {apiVehicleData.color}</div>
+                      )}
+                      {apiVehicleData.condition && (
+                        <div><span className="font-medium text-slate-700">Condition:</span> {apiVehicleData.condition}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Additional details */}
+                  <div className="bg-white rounded-lg p-4">
+                    <h3 className="font-semibold text-slate-900 mb-3">Additional Details</h3>
+                    <div className="space-y-2 text-sm">
+                      {apiVehicleData.mileageEstimate && (
+                        <div><span className="font-medium text-slate-700">Estimated Mileage:</span> {apiVehicleData.mileageEstimate}</div>
+                      )}
+                      {apiVehicleData.transmission && (
+                        <div><span className="font-medium text-slate-700">Transmission:</span> {apiVehicleData.transmission}</div>
+                      )}
+                      {apiVehicleData.fuelType && (
+                        <div><span className="font-medium text-slate-700">Fuel Type:</span> {apiVehicleData.fuelType}</div>
+                      )}
+                      {apiVehicleData.estimatedValue && (
+                        <div><span className="font-medium text-slate-700">Estimated Value:</span> {apiVehicleData.estimatedValue}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Full JSON for reference */}
+                <details className="mt-4">
+                  <summary className="cursor-pointer font-semibold text-slate-700 hover:text-slate-900">
+                    View Full Data (JSON)
+                  </summary>
+                  <div className="bg-white rounded-lg p-4 mt-2 max-h-96 overflow-y-auto">
+                    <pre className="text-xs text-slate-700 whitespace-pre-wrap break-words">
+                      {JSON.stringify(apiVehicleData, null, 2)}
+                    </pre>
+                  </div>
+                </details>
+              </div>
+            )}
+
+            {apiError && !apiVehicleData && (
+              <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                <p className="text-amber-800 text-sm">
+                  <span className="font-semibold">License Plate Data Not Found: </span>{apiError}
+                  <br />
+                  <span className="text-xs mt-1 block">AI has extracted vehicle information from your uploaded images instead.</span>
+                </p>
+              </div>
+            )}
+
             {/* Analysis Results Display */}
             {tireAnalysis && <TireAnalysisResults analysis={tireAnalysis} onAnalyzeAgain={handleAnalyzeAgain} />}
             
             {!tireAnalysis && !isAnalyzing && (
                 <div className="text-center py-8 text-slate-500">
-                    <p>Enter your vehicle type and mileage, upload at least 1 image, then click 'Run Vehicle Analysis' to get AI-powered maintenance recommendations.</p>
+                    <p>Enter your vehicle type and mileage, upload at least 1 image, then click 'Fetch Vehicle Data & Analyze' to get AI-powered maintenance recommendations.</p>
                 </div>
             )}
           </div>

@@ -5,7 +5,8 @@ import Header from "./components/Header";
 import VehicleInfo from "./components/VehicleInfo";
 import ManualDataForm from "./components/ManualDataForm";
 import { db } from "./firebase";
-import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore"; // Added collection, getDocs
+import { doc, setDoc } from "firebase/firestore";
+import { fetchVehicleDataFromLicensePlate, extractVehicleDataFromImages } from "./services/aiBrowser";
 
 // Import other components (assuming they exist)
 import ListPage from "./pages/ListPage";
@@ -21,80 +22,35 @@ function App() {
   // New state to hold tire analysis data from ManualDataForm
   const [tireAnalysisData, setTireAnalysisData] = useState(null);
 
-  // 1. Fetch all plates for the dropdown
-  useEffect(() => {
-    const fetchAllPlates = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "vehicle"));
-        const plates = querySnapshot.docs.map(doc => doc.id).sort();
-        setAllPlates(plates);
-      } catch (error) {
-        console.error("Error fetching all plates:", error);
-      }
-    };
-    fetchAllPlates();
-  }, []);
+  // Image and vehicle info state for the first page
+  const [vehicleImages, setVehicleImages] = useState([]);
+  const [vehicleMake, setVehicleMake] = useState("");
+  const [vehicleModel, setVehicleModel] = useState("");
 
-  // 2. Handler for dropdown change
-  const handlePlateChange = (e) => {
-    const newPlate = e.target.value;
-    setPlate(newPlate);
-    // Automatically fetch data for the selected plate
-    if (newPlate) {
-      fetchData(newPlate);
-    } else {
-      // Clear data if "Select a plate..." is chosen
-      setVehicleData(null);
-      setManualData({});
-      setTireAnalysisData(null);
-    }
-  };
-
-  // 3. Updated fetchData to accept plate as argument
+  // Fresh data fetch - no Firestore lookup
   const fetchData = async (currentPlate = plate) => {
-  if (!currentPlate) return;
-
-  setLoading(true);
-
-  try {
-    // Fetch data from Firestore
-    const snap = await getDoc(doc(db, "vehicle", currentPlate));
-
-    if (!snap.exists()) {
-      alert("No data found for this plate in Firestore");
-      setVehicleData(null);
-      setManualData({});
-      setTireAnalysisData(null);
+    if (!currentPlate || vehicleImages.length === 0) {
+      alert("Please enter a license plate and upload at least 1 image");
       return;
     }
 
-    const snapData = snap.data();
+    setLoading(true);
+    setVehicleData(null);
+    setManualData({});
+    setTireAnalysisData(null);
 
-    // Load API vehicle data (previously saved)
-    setVehicleData(snapData.apiData || null);
-
-    // Load manual data
-    const loadedManualData = snapData.manualData || {};
-
-    setManualData(prev => ({
-      ...prev,
-      ...loadedManualData,
-      maintenance: loadedManualData.maintenance || prev.maintenance,
-      lease: loadedManualData.lease || prev.lease,
-      insurance: loadedManualData.insurance || prev.insurance,
-      liens: loadedManualData.liens || prev.liens,
-    }));
-
-    // Load tire analysis
-    setTireAnalysisData(loadedManualData.tireAnalysis || null);
-
-  } catch (err) {
-    console.error(err);
-    alert("Error fetching data – check console");
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      console.log("[v0] Fetching fresh data for plate:", currentPlate);
+      // Data will be fetched through ManualDataForm which calls the API endpoint
+      // This is just to trigger the form display
+      setVehicleData({ initialized: true }); // Placeholder to show ManualDataForm
+    } catch (err) {
+      console.error("[v0] Error:", err);
+      alert("Error fetching data – check console");
+    } finally {
+      setLoading(false);
+    }
+  };
   // 4. Handler to receive analysis data from ManualDataForm
   const handleAnalysisComplete = (analysisResult) => {
     setTireAnalysisData(analysisResult);
@@ -148,42 +104,105 @@ const saveEverything = async () => {
           <Header />
 
           <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-            {/* Search bar + Dropdown + nav */}
-            <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            
-              {/* Input for typing new plate */}
-              <input
-                className="input"
-                placeholder="Enter license plate (e.g. EF24448)"
-                value={plate}
-                onChange={(e) => setPlate(e.target.value.toUpperCase())}
-              />
-            
-              {/* Dropdown for saved vehicles */}
-              <select
-                id="plate-select"
-                value={plate || ""}
-                onChange={handlePlateChange}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white text-lg font-semibold focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Select a plate...</option>
-                {allPlates.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            
+            {/* Unified Form - License Plate, Images, Make, Model */}
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+              <h2 className="text-2xl font-bold text-slate-900 mb-6">Vehicle Information & Images</h2>
+              
+              {/* License Plate Input */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  License Plate <span className="text-red-600">*</span>
+                </label>
+                <input
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white text-lg font-semibold focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter license plate (e.g. EF24448)"
+                  value={plate}
+                  onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                />
+              </div>
+
+              {/* Image Upload */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Vehicle Images <span className="text-red-600">*</span> (Min 1 - Max 5)
+                </label>
+                <p className="text-xs text-slate-500 mb-3">Upload clear photos of your vehicle (exterior, interior, tires, engine bay)</p>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length > 5) {
+                      alert("Maximum 5 images allowed. Only the first 5 will be used.");
+                      setVehicleImages(files.slice(0, 5));
+                    } else {
+                      setVehicleImages(files);
+                    }
+                  }}
+                  disabled={vehicleImages.length >= 5}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
+                />
+                {vehicleImages.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {vehicleImages.map((img, idx) => (
+                      <div key={idx} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        {img.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Make and Model */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Vehicle Make (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Toyota, BMW, Ford"
+                    value={vehicleMake}
+                    onChange={(e) => setVehicleMake(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Vehicle Model (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Camry, 3 Series, Mustang"
+                    value={vehicleModel}
+                    onChange={(e) => setVehicleModel(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
               {/* Buttons */}
               <div className="flex gap-2">
-                <button className="button" onClick={() => fetchData()}>
-                  {loading ? "Loading…" : "Fetch Vehicle Data"}
+                <button 
+                  className={`flex-1 px-4 py-3 rounded-lg text-white font-medium transition-colors ${
+                    vehicleImages.length === 0 || !plate
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                  onClick={() => fetchData()}
+                  disabled={vehicleImages.length === 0 || !plate || loading}
+                >
+                  {loading ? "Loading…" : "Fetch Vehicle Data & Analyze"}
                 </button>
             
                 <button
-                  className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition"
+                  className="px-4 py-3 rounded-lg bg-gray-600 text-white hover:bg-gray-700 transition font-medium"
                   onClick={() => {
                     setPlate("");
+                    setVehicleImages([]);
+                    setVehicleMake("");
+                    setVehicleModel("");
                     setVehicleData(null);
                     setManualData({});
                     setTireAnalysisData(null);
@@ -191,12 +210,11 @@ const saveEverything = async () => {
                 >
                   Reset
                 </button>
-            
-                <Link to="/list" className="button bg-green-600 hover:bg-green-700">
-                  See saved
-                </Link>
               </div>
-            
+              
+              {vehicleImages.length === 0 && plate && (
+                <p className="text-xs text-amber-600 mt-2">Upload at least 1 image to proceed</p>
+              )}
             </div>
 
 
@@ -208,7 +226,10 @@ const saveEverything = async () => {
                   manualData={manualDataWithAnalysis} 
                   setManualData={setManualData} 
                   plate={plate}
-                  onAnalysisComplete={handleAnalysisComplete} // FIX: Pass the required prop
+                  onAnalysisComplete={handleAnalysisComplete}
+                  vehicleImages={vehicleImages}
+                  vehicleMake={vehicleMake}
+                  vehicleModel={vehicleModel}
                 />
                 <VehicleInfo vehicleData={vehicleData} />
                 <div className="mt-4 flex gap-2">
