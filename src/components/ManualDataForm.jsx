@@ -284,7 +284,7 @@ const TireAnalysisResults = ({ analysis, onAnalyzeAgain }) => {
 
 // --- Main Component ---
 
-export default function ManualDataForm({ manualData = {}, setManualData, plate = "", readOnly = false, onAnalysisComplete, vehicleImages = [], vehicleMake = "", vehicleModel = "", vehicleData = null }) { // Added vehicleData prop from API
+export default function ManualDataForm({ manualData = {}, setManualData, plate = "", readOnly = false, onAnalysisComplete, vehicleImages = [], vehicleMake = "", vehicleModel = "", vehicleData = null, healthAnalysis = null }) { // Added healthAnalysis prop
   const {t} = useTranslation('mdf');
   const [workshops, setWorkshops] = useState([])
   const [leaseFile, setLeaseFile] = useState(null)
@@ -784,14 +784,17 @@ const MAINT_TYPES = [
 
         {/* Right Column: Data Blocks */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Vehicle Health Analysis Note */}
-          <div className="bg-blue-50 rounded-xl shadow-md border border-blue-200 p-6">
-            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2 mb-2">
-              <Wrench size={20} className="text-blue-600" /> Vehicle Health Analysis
-            </h2>
-            <p className="text-slate-700">Vehicle health analysis is performed on the first screen. Please go back to analyze your vehicle's health with uploaded images and mileage information.</p>
-          
-          </div>
+          {/* Vehicle Health Analysis Results */}
+          {healthAnalysis ? (
+            <TireAnalysisResults analysis={healthAnalysis} onAnalyzeAgain={() => {}} />
+          ) : (
+            <div className="bg-blue-50 rounded-xl shadow-md border border-blue-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2 mb-2">
+                <Wrench size={20} className="text-blue-600" /> Vehicle Health Analysis
+              </h2>
+              <p className="text-slate-700">Vehicle health analysis results will appear here after you click "Analyze Vehicle Health" on the first screen.</p>
+            </div>
+          )}
 
           {/* Manual Data Blocks */}
           {BLOCKS.map((block) => (

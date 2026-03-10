@@ -270,49 +270,37 @@ const saveEverything = async () => {
               </div>
 
               {/* Buttons */}
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <button 
-                    className={`flex-1 px-4 py-3 rounded-lg text-white font-medium transition-colors ${
-                      vehicleImages.length === 0 || !plate
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700"
-                    }`}
-                    onClick={() => fetchData()}
-                    disabled={vehicleImages.length === 0 || !plate || loading}
-                  >
-                    {loading ? "Loading…" : "Fetch Vehicle Data"}
-                  </button>
-              
-                  <button
-                    className="px-4 py-3 rounded-lg bg-gray-600 text-white hover:bg-gray-700 transition font-medium"
-                    onClick={() => {
-                      setPlate("");
-                      setVehicleImages([]);
-                      setVehicleMake("");
-                      setVehicleModel("");
-                      setVehicleData(null);
-                      setManualData({});
-                      setTireAnalysisData(null);
-                      setHealthAnalysis(null);
-                      setHealthMileage("");
-                    }}
-                  >
-                    Reset
-                  </button>
-                </div>
-
-                {/* Analyze Vehicle Health Button - on first form */}
+              <div className="flex gap-2">
                 <button 
-                  className={`w-full px-4 py-3 rounded-lg text-white font-medium transition-colors ${
-                    vehicleImages.length === 0 || !healthMileage
-                      ? "bg-orange-400 cursor-not-allowed"
-                      : "bg-orange-600 hover:bg-orange-700"
+                  className={`flex-1 px-4 py-3 rounded-lg text-white font-medium transition-colors ${
+                    vehicleImages.length === 0 || !plate || !healthMileage
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700"
                   }`}
-                  onClick={analyzeVehicleHealthOnFirstScreen}
-                  disabled={vehicleImages.length === 0 || !healthMileage || isAnalyzingHealth}
+                  onClick={async () => {
+                    await fetchData();
+                    await analyzeVehicleHealthOnFirstScreen();
+                  }}
+                  disabled={vehicleImages.length === 0 || !plate || !healthMileage || loading || isAnalyzingHealth}
                 >
-                  {isAnalyzingHealth ? "Analyzing Vehicle Health..." : "Analyze Vehicle Health"}
+                  {loading || isAnalyzingHealth ? "Processing…" : "Analyze Vehicle Health"}
+                </button>
+            
+                <button
+                  className="px-4 py-3 rounded-lg bg-gray-600 text-white hover:bg-gray-700 transition font-medium"
+                  onClick={() => {
+                    setPlate("");
+                    setVehicleImages([]);
+                    setVehicleMake("");
+                    setVehicleModel("");
+                    setVehicleData(null);
+                    setManualData({});
+                    setTireAnalysisData(null);
+                    setHealthAnalysis(null);
+                    setHealthMileage("");
+                  }}
+                >
+                  Reset
                 </button>
               </div>
               
@@ -337,102 +325,6 @@ const saveEverything = async () => {
                 <VehicleDashboard 
                   vehicleData={vehicleData}
                 />
-
-                {/* Health Analysis Results Display (if analyzed) */}
-                {healthAnalysis && (
-                  <div className="bg-white rounded-lg shadow-lg p-6 border-l-4 border-orange-600">
-                    <h2 className="text-2xl font-bold text-slate-900 mb-6">Vehicle Health Analysis Results</h2>
-                    
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-orange-50 p-4 rounded-lg">
-                          <p className="text-sm text-slate-600">Vehicle Type</p>
-                          <p className="text-lg font-semibold text-slate-900">{healthAnalysis.vehicleType}</p>
-                        </div>
-                        <div className="bg-orange-50 p-4 rounded-lg">
-                          <p className="text-sm text-slate-600">Mileage</p>
-                          <p className="text-lg font-semibold text-slate-900">{healthAnalysis.mileage} km</p>
-                        </div>
-                      </div>
-
-                      {healthAnalysis.imageAnalysis && (
-                        <div className="bg-slate-50 p-4 rounded-lg">
-                          <h3 className="font-semibold text-slate-900 mb-2">Image Analysis</h3>
-                          <p className="text-slate-700">{healthAnalysis.imageAnalysis}</p>
-                        </div>
-                      )}
-
-                      {healthAnalysis.condition && (
-                        <div className="bg-slate-50 p-4 rounded-lg">
-                          <h3 className="font-semibold text-slate-900 mb-2">Overall Condition</h3>
-                          <p className="text-slate-700">{healthAnalysis.condition}</p>
-                        </div>
-                      )}
-
-                      {healthAnalysis.riskLevel && (
-                        <div className="bg-slate-50 p-4 rounded-lg">
-                          <h3 className="font-semibold text-slate-900 mb-2">Risk Level</h3>
-                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
-                            healthAnalysis.riskLevel === 'high' ? 'bg-red-100 text-red-800' :
-                            healthAnalysis.riskLevel === 'medium' ? 'bg-amber-100 text-amber-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {healthAnalysis.riskLevel.toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-
-                      {healthAnalysis.criticalIssues && healthAnalysis.criticalIssues.length > 0 && (
-                        <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                          <h3 className="font-semibold text-red-900 mb-2">Critical Issues</h3>
-                          <ul className="list-disc list-inside space-y-1">
-                            {healthAnalysis.criticalIssues.map((issue, idx) => (
-                              <li key={idx} className="text-red-700 text-sm">{typeof issue === 'string' ? issue : JSON.stringify(issue)}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {healthAnalysis.maintenance && healthAnalysis.maintenance.length > 0 && (
-                        <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-                          <h3 className="font-semibold text-amber-900 mb-3">Maintenance Needed</h3>
-                          <div className="space-y-2">
-                            {healthAnalysis.maintenance.map((task, idx) => (
-                              <div key={idx} className="bg-white p-2 rounded border-l-4 border-amber-500">
-                                {typeof task === 'string' ? (
-                                  <p className="text-amber-900 text-sm">{task}</p>
-                                ) : (
-                                  <div>
-                                    <p className="text-amber-900 font-medium text-sm">{task.task || JSON.stringify(task)}</p>
-                                    {task.reason && <p className="text-amber-800 text-xs mt-1">{task.reason}</p>}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {healthAnalysis.recommendations && healthAnalysis.recommendations.length > 0 && (
-                        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                          <h3 className="font-semibold text-green-900 mb-2">Recommendations</h3>
-                          <ul className="list-disc list-inside space-y-1">
-                            {healthAnalysis.recommendations.map((rec, idx) => (
-                              <li key={idx} className="text-green-700 text-sm">{typeof rec === 'string' ? rec : JSON.stringify(rec)}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {healthAnalysis.maintenanceTimeline && (
-                        <div className="bg-slate-50 p-4 rounded-lg">
-                          <h3 className="font-semibold text-slate-900 mb-2">Maintenance Timeline</h3>
-                          <p className="text-slate-700">{healthAnalysis.maintenanceTimeline}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
                 
                 {/* Manual Data Entry Form */}
                 <div className="bg-white rounded-lg shadow-lg p-6">
@@ -446,6 +338,7 @@ const saveEverything = async () => {
                     vehicleImages={vehicleImages}
                     vehicleMake={vehicleMake}
                     vehicleModel={vehicleModel}
+                    healthAnalysis={healthAnalysis}
                   />
                   
                   {/* Save Button */}
