@@ -255,35 +255,64 @@ const saveEverything = async () => {
                 </div>
               </div>
 
+              {/* Mileage for Vehicle Health Analysis */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Current Mileage (km) <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="number"
+                  placeholder="Enter current mileage in kilometers"
+                  value={healthMileage}
+                  onChange={(e) => setHealthMileage(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
               {/* Buttons */}
-              <div className="flex gap-2">
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <button 
+                    className={`flex-1 px-4 py-3 rounded-lg text-white font-medium transition-colors ${
+                      vehicleImages.length === 0 || !plate
+                        ? "bg-gray-400 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700"
+                    }`}
+                    onClick={() => fetchData()}
+                    disabled={vehicleImages.length === 0 || !plate || loading}
+                  >
+                    {loading ? "Loading…" : "Fetch Vehicle Data"}
+                  </button>
+              
+                  <button
+                    className="px-4 py-3 rounded-lg bg-gray-600 text-white hover:bg-gray-700 transition font-medium"
+                    onClick={() => {
+                      setPlate("");
+                      setVehicleImages([]);
+                      setVehicleMake("");
+                      setVehicleModel("");
+                      setVehicleData(null);
+                      setManualData({});
+                      setTireAnalysisData(null);
+                      setHealthAnalysis(null);
+                      setHealthMileage("");
+                    }}
+                  >
+                    Reset
+                  </button>
+                </div>
+
+                {/* Analyze Vehicle Health Button - on first form */}
                 <button 
-                  className={`flex-1 px-4 py-3 rounded-lg text-white font-medium transition-colors ${
-                    vehicleImages.length === 0 || !plate
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700"
+                  className={`w-full px-4 py-3 rounded-lg text-white font-medium transition-colors ${
+                    vehicleImages.length === 0 || !healthMileage
+                      ? "bg-orange-400 cursor-not-allowed"
+                      : "bg-orange-600 hover:bg-orange-700"
                   }`}
-                  onClick={() => fetchData()}
-                  disabled={vehicleImages.length === 0 || !plate || loading}
+                  onClick={analyzeVehicleHealthOnFirstScreen}
+                  disabled={vehicleImages.length === 0 || !healthMileage || isAnalyzingHealth}
                 >
-                  {loading ? "Loading…" : "Fetch Vehicle Data & Analyze"}
-                </button>
-            
-                <button
-                  className="px-4 py-3 rounded-lg bg-gray-600 text-white hover:bg-gray-700 transition font-medium"
-                  onClick={() => {
-                    setPlate("");
-                    setVehicleImages([]);
-                    setVehicleMake("");
-                    setVehicleModel("");
-                    setVehicleData(null);
-                    setManualData({});
-                    setTireAnalysisData(null);
-                    setHealthAnalysis(null);
-                    setHealthMileage("");
-                  }}
-                >
-                  Reset
+                  {isAnalyzingHealth ? "Analyzing Vehicle Health..." : "Analyze Vehicle Health"}
                 </button>
               </div>
               
@@ -301,55 +330,26 @@ const saveEverything = async () => {
               </div>
             )}
 
-            {/* Results Display - Vehicle Dashboard, Health Analysis, and Manual Data Form */}
+            {/* Results Display - Vehicle Dashboard and Manual Data Form */}
             {!loading && vehicleData && (
               <div className="lg:col-span-2 space-y-8">
                 {/* API Vehicle Data Dashboard */}
                 <VehicleDashboard 
                   vehicleData={vehicleData}
                 />
-                
-                {/* Health Analysis Section */}
-                <div className="bg-white rounded-lg shadow-lg p-6 border-l-4 border-blue-600">
-                  <h2 className="text-2xl font-bold text-slate-900 mb-6">Vehicle Health Analysis</h2>
-                  
-                  {!healthAnalysis ? (
-                    <div className="space-y-4">
-                      <p className="text-slate-600 mb-4">Analyze your vehicle's health based on uploaded images</p>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Current Mileage (km) <span className="text-red-600">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          placeholder="Enter current mileage"
-                          value={healthMileage}
-                          onChange={(e) => setHealthMileage(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      
-                      <button
-                        onClick={analyzeVehicleHealthOnFirstScreen}
-                        disabled={isAnalyzingHealth || !healthMileage || vehicleImages.length === 0}
-                        className={`w-full px-4 py-3 rounded-lg text-white font-medium transition-colors ${
-                          isAnalyzingHealth || !healthMileage || vehicleImages.length === 0
-                            ? "bg-gray-400 cursor-not-allowed"
-                            : "bg-blue-600 hover:bg-blue-700"
-                        }`}
-                      >
-                        {isAnalyzingHealth ? "Analyzing Vehicle Health..." : "Analyze Vehicle Health"}
-                      </button>
-                    </div>
-                  ) : (
+
+                {/* Health Analysis Results Display (if analyzed) */}
+                {healthAnalysis && (
+                  <div className="bg-white rounded-lg shadow-lg p-6 border-l-4 border-orange-600">
+                    <h2 className="text-2xl font-bold text-slate-900 mb-6">Vehicle Health Analysis Results</h2>
+                    
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-blue-50 p-4 rounded-lg">
+                        <div className="bg-orange-50 p-4 rounded-lg">
                           <p className="text-sm text-slate-600">Vehicle Type</p>
                           <p className="text-lg font-semibold text-slate-900">{healthAnalysis.vehicleType}</p>
                         </div>
-                        <div className="bg-blue-50 p-4 rounded-lg">
+                        <div className="bg-orange-50 p-4 rounded-lg">
                           <p className="text-sm text-slate-600">Mileage</p>
                           <p className="text-lg font-semibold text-slate-900">{healthAnalysis.mileage} km</p>
                         </div>
@@ -430,16 +430,9 @@ const saveEverything = async () => {
                           <p className="text-slate-700">{healthAnalysis.maintenanceTimeline}</p>
                         </div>
                       )}
-
-                      <button
-                        onClick={() => setHealthAnalysis(null)}
-                        className="w-full px-4 py-2 rounded-lg bg-slate-200 text-slate-900 hover:bg-slate-300 transition font-medium text-sm"
-                      >
-                        Analyze Again
-                      </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
                 
                 {/* Manual Data Entry Form */}
                 <div className="bg-white rounded-lg shadow-lg p-6">
