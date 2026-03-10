@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { collection, getDocs } from "firebase/firestore" // Removed addDoc
 import { db } from "../firebase"
-import { askOpenAI, uploadCloudinaryUnsigned, analyzeVehicleImages, fetchVehicleDataFromLicensePlate, extractVehicleDataFromImages } from "../services/aiBrowser"
+import { askOpenAI, uploadCloudinaryUnsigned, analyzeVehicleImages, fetchVehicleDataFromLicensePlate, extractVehicleDataFromImages, analyzeVehicleHealth } from "../services/aiBrowser"
 import { askChat } from "../services/api"
 import {
   AlertCircle,
@@ -548,81 +548,51 @@ const MAINT_TYPES = [
     setApiError(null);
 
     try {
-      let vehicleData = null;
-      let vehicleDataSource = null;
-      let healthAnalysis = null;
-      let apiSucceeded = false;
-
-      console.log("[v0] Starting vehicle data fetch and analysis...");
-
-      // Step 1: Try to fetch from API first
-      if (plate) {
-        console.log("[v0] Attempting to fetch vehicle data from API for plate:", plate);
-        const apiResult = await fetchVehicleDataFromLicensePlate(plate, make, model);
-        
-        if (apiResult.success && apiResult.data) {
-          console.log("[v0] API returned vehicle data successfully - skipping analysis");
-          vehicleData = apiResult.data;
-          vehicleDataSource = "API";
-          apiSucceeded = true;
-          setApiVehicleData(vehicleData);
-        } else {
-          console.log("[v0] API failed, will do AI extraction + analysis:", apiResult.error);
-          setApiError(apiResult.error);
-        }
+      if (!vehicleType || !mileage || !tireImages || tireImages.length === 0) {
+        alert("Please fill in vehicle type, mileage, and upload at least 1 image");
+        return;
       }
 
-      // Step 2: If API failed, do BOTH extraction and analysis in parallel
-      if (!apiSucceeded && tireImages.length > 0) {
-        console.log("[v0] API failed - running AI extraction and health analysis in parallel...");
-        
-        // Run extraction and analysis at the same time
-        const [extractionResult, healthResult] = await Promise.all([
-          extractVehicleDataFromImages(tireImages, plate, make, model),
-          analyzeVehicleImages(tireImages, vehicleType, mileage, make, model)
-        ]);
-
-        // Handle extraction result
-        if (extractionResult.success && extractionResult.data) {
-          console.log("[v0] AI extraction successful");
-          vehicleData = extractionResult.data;
-          vehicleDataSource = "AI (Extracted from Images)";
-          setApiVehicleData(vehicleData);
-        } else {
-          console.error("[v0] AI extraction failed:", extractionResult.error);
-          setApiError(extractionResult.error || "Failed to extract vehicle data from images");
-        }
-
-        // Handle health analysis result
-        if (!healthResult.error) {
-          console.log("[v0] Health analysis successful");
-          healthAnalysis = {
-            imageAnalysis: healthResult.imageAnalysis || "Analysis complete",
-            condition: healthResult.condition || "Vehicle condition assessed from images",
-            riskLevel: healthResult.riskLevel || "medium",
-            criticalIssues: healthResult.criticalIssues || [],
-            maintenance: healthResult.maintenance || [],
-            recommendations: healthResult.recommendations || [],
-            maintenanceTimeline: healthResult.maintenanceTimeline || "Based on condition"
-          };
-          setTireAnalysis(healthAnalysis);
-        }
-      }
-
-      // Pass complete results to parent
-      onAnalysisComplete({
+      console.log("[v0] Starting vehicle health analysis with:", {
         vehicleType,
         mileage,
-        make,
-        model,
-        licensePlate: plate,
-        timestamp: new Date().toISOString(),
-        imageCount: tireImages.length,
-        vehicleData: vehicleData,
-        vehicleDataSource: vehicleDataSource,
-        healthAnalysis: healthAnalysis,
-        apiSucceeded: apiSucceeded
+        imageCount: tireImages.length
       });
+
+      // Call the analyzeVehicleHealth endpoint
+      const healthResult = await analyzeVehicleHealth(vehicleType, mileage, tireImages);
+
+      if (healthResult.success && healthResult.data) {
+        console.log("[v0] Health analysis successful:", healthResult.data);
+        
+        const analysisData = healthResult.data;
+        const healthAnalysis = {
+          imageAnalysis: analysisData.imageAnalysis || analysisData.analysis || "Analysis complete",
+          condition: analysisData.condition || "Vehicle condition assessed",
+          riskLevel: analysisData.riskLevel || "medium",
+          criticalIssues: analysisData.criticalIssues || [],
+          maintenance: analysisData.maintenance || [],
+          recommendations: analysisData.recommendations || [],
+          maintenanceTimeline: analysisData.maintenanceTimeline || "Based on condition"
+        };
+        
+        setTireAnalysis(healthAnalysis);
+        
+        // Pass results to parent
+        onAnalysisComplete({
+          vehicleType,
+          mileage,
+          make,
+          model,
+          licensePlate: plate,
+          timestamp: new Date().toISOString(),
+          imageCount: tireImages.length,
+          healthAnalysis: healthAnalysis
+        });
+      } else {
+        console.error("[v0] Analysis error:", healthResult.error);
+        alert("Analysis failed: " + healthResult.error);
+      }
 
     } catch (e) {
       console.error("[v0] Analysis Error:", e);

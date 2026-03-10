@@ -449,6 +449,55 @@ Provide ONLY valid JSON without markdown formatting or code blocks. Extract maxi
   }
 };
 
+/* ----------  Analyze Vehicle Health  ---------- */
+export const analyzeVehicleHealth = async (vehicleType, mileage, images) => {
+  try {
+    if (!vehicleType || !mileage || !images || images.length === 0) {
+      return { error: "Vehicle type, mileage, and at least 1 image are required" };
+    }
+
+    // Use proxy endpoint to avoid CORS issues
+    const proxyUrl = `/api/vehicle/analyzeVehicleHealth`;
+
+    console.log("[v0] Analyzing vehicle health...");
+
+    // Create FormData to send files and form fields
+    const formData = new FormData();
+    formData.append("vehicleType", vehicleType);
+    formData.append("mileage", mileage);
+    
+    // Add images - take only the first image for now
+    if (images && images.length > 0) {
+      formData.append("image", images[0]);
+    }
+
+    const response = await axios.post(proxyUrl, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data"
+      }
+    });
+
+    if (response.data?.success || response.data?.data) {
+      const analysisData = response.data.data || response.data;
+      console.log("[v0] Vehicle health analysis successful:", analysisData);
+      return {
+        success: true,
+        data: analysisData
+      };
+    } else {
+      return {
+        error: response.data?.message || "Failed to analyze vehicle health"
+      };
+    }
+  } catch (err) {
+    console.error("[v0] Vehicle health analysis error:", err.response?.status, err.response?.data || err.message);
+    return {
+      error: "Failed to analyze vehicle health",
+      details: err.response?.data?.error?.message || err.message
+    };
+  }
+};
+
 /* ----------  Cloudinary UNSIGNED (works locally)  ---------- */
 export async function uploadCloudinaryUnsigned(file, folder = "vehicle-app") {
   const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`;
