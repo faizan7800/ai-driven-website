@@ -84,14 +84,21 @@ function App() {
 
   // Function to analyze vehicle health
   const analyzeVehicleHealthOnFirstScreen = async () => {
-    if (!vehicleData || vehicleImages.length === 0 || !healthMileage) {
+    if (vehicleImages.length === 0 || !healthMileage) {
       alert("Please enter mileage and ensure images are uploaded");
       return;
     }
 
     setIsAnalyzingHealth(true);
     try {
-      const vehicleType = `${vehicleData.merke || vehicleData.make || vehicleMake} ${vehicleData.handelsbetegnelse || vehicleData.model || vehicleModel}`;
+      // Build vehicle type from available data
+      let vehicleType = "";
+      if (vehicleData) {
+        vehicleType = `${vehicleData.merke || vehicleData.make || vehicleMake} ${vehicleData.handelsbetegnelse || vehicleData.model || vehicleModel}`;
+      } else {
+        vehicleType = `${vehicleMake} ${vehicleModel}`.trim() || "Unknown Vehicle";
+      }
+      
       console.log("[v0] Starting health analysis with:", { vehicleType, mileage: healthMileage });
       
       const result = await analyzeVehicleHealth(vehicleType, healthMileage, vehicleImages);
@@ -273,17 +280,19 @@ const saveEverything = async () => {
               <div className="flex gap-2">
                 <button 
                   className={`flex-1 px-4 py-3 rounded-lg text-white font-medium transition-colors ${
-                    vehicleImages.length === 0 || !plate || !healthMileage
+                    vehicleImages.length === 0 || !healthMileage || !(vehicleMake && vehicleModel)
                       ? "bg-gray-400 cursor-not-allowed"
                       : "bg-blue-600 hover:bg-blue-700"
                   }`}
                   onClick={async () => {
-                    await fetchData();
+                    if (plate) {
+                      await fetchData();
+                    }
                     await analyzeVehicleHealthOnFirstScreen();
                   }}
-                  disabled={vehicleImages.length === 0 || !plate || !healthMileage || loading || isAnalyzingHealth}
+                  disabled={vehicleImages.length === 0 || !healthMileage || !(vehicleMake && vehicleModel) || isAnalyzingHealth}
                 >
-                  {loading || isAnalyzingHealth ? "Processing…" : "Analyze Vehicle Health"}
+                  {isAnalyzingHealth ? "Analyzing…" : "Analyze Vehicle Health"}
                 </button>
             
                 <button
