@@ -205,11 +205,20 @@ const TireAnalysisResults = ({ analysis, onAnalyzeAgain }) => {
       )}
 
       {/* Maintenance Tasks */}
-      {analysis.maintenance && analysis.maintenance.length > 0 && (
+      {analysis.maintenance && Array.isArray(analysis.maintenance) && analysis.maintenance.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-xl font-bold text-slate-900">{t("maintenance_tasks_title")}</h3>
           <div className="grid gap-4">
             {analysis.maintenance.map((task, idx) => {
+              // Handle if task is a string instead of an object
+              if (typeof task === 'string') {
+                return (
+                  <div key={idx} className="p-4 rounded-lg bg-amber-50 border border-amber-300">
+                    <p className="text-amber-900 font-medium">{task}</p>
+                  </div>
+                );
+              }
+              
               const priorityColor = getPriorityColor(task.priority);
               return (
                 <div
@@ -236,7 +245,7 @@ const TireAnalysisResults = ({ analysis, onAnalyzeAgain }) => {
       )}
 
       {/* Recommendations */}
-      {analysis.recommendations && analysis.recommendations.length > 0 && (
+      {analysis.recommendations && Array.isArray(analysis.recommendations) && analysis.recommendations.length > 0 && (
         <div className="p-6 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200">
           <h3 className="text-xl font-bold text-green-900 mb-4 flex items-center gap-2">
             <CheckCircle size={20} className="text-green-600" /> Recommendations
@@ -245,7 +254,7 @@ const TireAnalysisResults = ({ analysis, onAnalyzeAgain }) => {
             {analysis.recommendations.map((rec, idx) => (
               <li key={idx} className="flex items-start gap-3 text-slate-800">
                 <span className="text-green-600 font-bold mt-0.5">✓</span>
-                <p className="m-0">{rec}</p>
+                <p className="m-0">{typeof rec === 'string' ? rec : JSON.stringify(rec)}</p>
               </li>
             ))}
           </ul>
@@ -565,17 +574,21 @@ const MAINT_TYPES = [
       if (healthResult.success && healthResult.data) {
         console.log("[v0] Health analysis successful:", healthResult.data);
         
-        const analysisData = healthResult.data;
+        const responseData = healthResult.data;
+        // Handle nested analysis object from API response
+        const analysisData = responseData.analysis || responseData;
+        
         const healthAnalysis = {
-          imageAnalysis: analysisData.imageAnalysis || analysisData.analysis || "Analysis complete",
+          imageAnalysis: analysisData.imageAnalysis || "Analysis complete",
           condition: analysisData.condition || "Vehicle condition assessed",
           riskLevel: analysisData.riskLevel || "medium",
-          criticalIssues: analysisData.criticalIssues || [],
-          maintenance: analysisData.maintenance || [],
-          recommendations: analysisData.recommendations || [],
+          criticalIssues: Array.isArray(analysisData.criticalIssues) ? analysisData.criticalIssues : [],
+          maintenance: Array.isArray(analysisData.maintenance) ? analysisData.maintenance : [],
+          recommendations: Array.isArray(analysisData.recommendations) ? analysisData.recommendations : [],
           maintenanceTimeline: analysisData.maintenanceTimeline || "Based on condition"
         };
         
+        console.log("[v0] Processed health analysis:", healthAnalysis);
         setTireAnalysis(healthAnalysis);
         
         // Pass results to parent
@@ -769,191 +782,15 @@ const MAINT_TYPES = [
           </div>
         </div>
 
-        {/* Right Column: Data Blocks and Tire Analysis */}
+        {/* Right Column: Data Blocks */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Tire Analysis Section */}
-          <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Wrench size={20} className="text-slate-600" /> Vehicle Health Analysis
+          {/* Vehicle Health Analysis Note */}
+          <div className="bg-blue-50 rounded-xl shadow-md border border-blue-200 p-6">
+            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2 mb-2">
+              <Wrench size={20} className="text-blue-600" /> Vehicle Health Analysis
             </h2>
-            
-            {/* Analysis Input Form (Hidden when results are present) */}
-            {!tireAnalysis && (
-              <>
-                {/* Analysis Input Fields */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <label className="flex items-center text-sm font-semibold text-slate-700 mb-2">
-                            <Car className="w-4 h-4 mr-2 text-blue-600" />
-                            {t('vehicle_type_label')}
-                        </label>
-                        <input
-                            type="text"
-                            value={vehicleType}
-                            onChange={(e) => setVehicleType(e.target.value)}
-                            placeholder={t('vehicle_type_placeholder')}
-                            required
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 placeholder:text-slate-400"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="flex items-center text-sm font-semibold text-slate-700 mb-2">
-                            <Gauge className="w-4 h-4 mr-2 text-blue-600" />
-                            {t('mileage_label')}
-                        </label>
-                        <input
-                            type="number"
-                            value={mileage}
-                            onChange={(e) => setMileage(e.target.value)}
-                            placeholder={t('mileage_placeholder')}
-                            required
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 placeholder:text-slate-400"
-                        />
-                    </div>
-                </div>
-
-                {/* Images from First Page Display */}
-                {vehicleImages && vehicleImages.length > 0 && (
-                  <div className="space-y-2">
-                    <label className="flex items-center text-sm font-semibold text-slate-700 mb-2">
-                      <Upload className="w-4 h-4 mr-2 text-green-600" />
-                      Uploaded Images {vehicleImages.length > 0 && `(${vehicleImages.length})`}
-                    </label>
-                    <div className="flex flex-wrap gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                      {vehicleImages.map((img, idx) => (
-                        <div key={idx} className="text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full">
-                          {img.name.substring(0, 20)}...
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {!vehicleImages || vehicleImages.length === 0 && (
-                  <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                    <p className="text-xs text-red-700">No images uploaded. Please upload at least 1 image from the first step.</p>
-                  </div>
-                )}
-
-                {/* Analyze Button */}
-                <div className="border-t border-slate-200 py-4 space-y-4">
-                  <button
-                    onClick={runTireAnalysis}
-                    disabled={isAnalyzing || !vehicleType || !vehicleImages || vehicleImages.length === 0}
-                    className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-white font-medium transition-colors ${
-                      isAnalyzing || !vehicleType || !vehicleImages || vehicleImages.length === 0
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700"
-                    }`}
-                  >
-                    {isAnalyzing ? (
-                      <>
-                        <Loader2 className="animate-spin" size={18} /> Analyzing...
-                      </>
-                    ) : (
-                      <>
-                        <Zap size={18} /> Analyze Vehicle
-                      </>
-                    )}
-                  </button>
-                  <p className="text-xs text-slate-500 text-center">
-                    {!vehicleImages || vehicleImages.length === 0
-                      ? "Upload at least 1 image from the first step to analyze"
-                      : `Ready to analyze with ${vehicleImages.length} image(s)`
-                    }
-                  </p>
-                </div>
-              </>
-            )}
-
-            {/* Vehicle Data Display (API or AI Extracted) */}
-            {apiVehicleData && (
-              <div className="space-y-4 p-6 bg-blue-50 rounded-xl shadow-lg border border-blue-200">
-                <h2 className="text-2xl font-bold text-blue-900 border-b pb-4 mb-4 flex items-center gap-2">
-                  <Car size={24} className="text-blue-600" /> 
-                  Vehicle Data
-                  <span className="text-sm font-normal text-blue-700 ml-2">
-                    ({apiVehicleData.source || "API"})
-                  </span>
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Key vehicle information */}
-                  <div className="bg-white rounded-lg p-4">
-                    <h3 className="font-semibold text-slate-900 mb-3">Basic Information</h3>
-                    <div className="space-y-2 text-sm">
-                      {apiVehicleData.make && (
-                        <div><span className="font-medium text-slate-700">Make:</span> {apiVehicleData.make}</div>
-                      )}
-                      {apiVehicleData.model && (
-                        <div><span className="font-medium text-slate-700">Model:</span> {apiVehicleData.model}</div>
-                      )}
-                      {apiVehicleData.year && (
-                        <div><span className="font-medium text-slate-700">Year:</span> {apiVehicleData.year}</div>
-                      )}
-                      {apiVehicleData.bodyType && (
-                        <div><span className="font-medium text-slate-700">Body Type:</span> {apiVehicleData.bodyType}</div>
-                      )}
-                      {apiVehicleData.color && (
-                        <div><span className="font-medium text-slate-700">Color:</span> {apiVehicleData.color}</div>
-                      )}
-                      {apiVehicleData.condition && (
-                        <div><span className="font-medium text-slate-700">Condition:</span> {apiVehicleData.condition}</div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Additional details */}
-                  <div className="bg-white rounded-lg p-4">
-                    <h3 className="font-semibold text-slate-900 mb-3">Additional Details</h3>
-                    <div className="space-y-2 text-sm">
-                      {apiVehicleData.mileageEstimate && (
-                        <div><span className="font-medium text-slate-700">Estimated Mileage:</span> {apiVehicleData.mileageEstimate}</div>
-                      )}
-                      {apiVehicleData.transmission && (
-                        <div><span className="font-medium text-slate-700">Transmission:</span> {apiVehicleData.transmission}</div>
-                      )}
-                      {apiVehicleData.fuelType && (
-                        <div><span className="font-medium text-slate-700">Fuel Type:</span> {apiVehicleData.fuelType}</div>
-                      )}
-                      {apiVehicleData.estimatedValue && (
-                        <div><span className="font-medium text-slate-700">Estimated Value:</span> {apiVehicleData.estimatedValue}</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Full JSON for reference */}
-                <details className="mt-4">
-                  <summary className="cursor-pointer font-semibold text-slate-700 hover:text-slate-900">
-                    View Full Data (JSON)
-                  </summary>
-                  <div className="bg-white rounded-lg p-4 mt-2 max-h-96 overflow-y-auto">
-                    <pre className="text-xs text-slate-700 whitespace-pre-wrap break-words">
-                      {JSON.stringify(apiVehicleData, null, 2)}
-                    </pre>
-                  </div>
-                </details>
-              </div>
-            )}
-
-            {apiError && !apiVehicleData && (
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
-                <p className="text-amber-800 text-sm">
-                  <span className="font-semibold">License Plate Data Not Found: </span>{apiError}
-                  <br />
-                  <span className="text-xs mt-1 block">AI has extracted vehicle information from your uploaded images instead.</span>
-                </p>
-              </div>
-            )}
-
-            {/* Analysis Results Display */}
-            {tireAnalysis && <TireAnalysisResults analysis={tireAnalysis} onAnalyzeAgain={handleAnalyzeAgain} />}
-            
-            {!tireAnalysis && !isAnalyzing && (
-                <div className="text-center py-8 text-slate-500">
-                    <p>Enter your vehicle type and mileage, upload at least 1 image, then click 'Fetch Vehicle Data & Analyze' to get AI-powered maintenance recommendations.</p>
-                </div>
-            )}
+            <p className="text-slate-700">Vehicle health analysis is performed on the first screen. Please go back to analyze your vehicle's health with uploaded images and mileage information.</p>
+          
           </div>
 
           {/* Manual Data Blocks */}

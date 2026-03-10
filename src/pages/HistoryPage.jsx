@@ -93,7 +93,7 @@ export default function HistoryPage() {
       {!loading && searchHistory.length === 0 && (
         <div className="bg-slate-50 border border-slate-200 rounded-lg p-8 text-center">
           <Car size={48} className="mx-auto text-slate-400 mb-4" />
-          <p className="text-slate-600 text-lg">No search history yet</p>
+          <p className="text-slate-600 text-lg">Nothing saved by you yet</p>
           <p className="text-slate-500 text-sm mt-2">Your search history will appear here when you save vehicle data</p>
         </div>
       )}
@@ -138,23 +138,57 @@ export default function HistoryPage() {
                     )}
                   </div>
 
-                  {item.manualData && (
+                  {(item.manualData || item.healthAnalysis) && (
                     <div className="mt-4 pt-4 border-t border-slate-200">
                       <p className="text-xs text-slate-500 uppercase mb-2">Additional Data</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                        {item.manualData.liens && (
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                        {item.healthAnalysis && (
+                          <div className="bg-orange-50 px-2 py-1 rounded flex items-center gap-1">
+                            <span className={`inline-block w-2 h-2 rounded-full ${
+                              item.healthAnalysis.riskLevel === 'high' ? 'bg-red-500' :
+                              item.healthAnalysis.riskLevel === 'medium' ? 'bg-amber-500' :
+                              'bg-green-500'
+                            }`}></span>
+                            <span>Health Analysis</span>
+                          </div>
+                        )}
+                        {item.manualData?.liens && (
                           <div className="bg-blue-50 px-2 py-1 rounded">Liens Info</div>
                         )}
-                        {item.manualData.lease && (
+                        {item.manualData?.lease && (
                           <div className="bg-purple-50 px-2 py-1 rounded">Lease Info</div>
                         )}
-                        {item.manualData.insurance && (
+                        {item.manualData?.insurance && (
                           <div className="bg-green-50 px-2 py-1 rounded">Insurance</div>
                         )}
-                        {item.manualData.maintenance && (
+                        {item.manualData?.maintenance && (
                           <div className="bg-amber-50 px-2 py-1 rounded">Maintenance</div>
                         )}
                       </div>
+                      
+                      {item.healthAnalysis && (
+                        <div className="mt-3 p-3 bg-orange-50 rounded border border-orange-200">
+                          <p className="text-xs text-orange-600 font-semibold uppercase mb-2">Vehicle Health</p>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                            <div>
+                              <span className="text-orange-700 font-medium">Condition:</span>
+                              <p className="text-orange-900">{item.healthAnalysis.condition?.substring(0, 20) || 'N/A'}...</p>
+                            </div>
+                            <div>
+                              <span className="text-orange-700 font-medium">Risk Level:</span>
+                              <p className="text-orange-900">{item.healthAnalysis.riskLevel?.toUpperCase() || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <span className="text-orange-700 font-medium">Critical Issues:</span>
+                              <p className="text-orange-900">{item.healthAnalysis.criticalIssues?.length || 0}</p>
+                            </div>
+                            <div>
+                              <span className="text-orange-700 font-medium">Maintenance Tasks:</span>
+                              <p className="text-orange-900">{item.healthAnalysis.maintenance?.length || 0}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
